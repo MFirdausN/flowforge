@@ -59,8 +59,8 @@ describe('AiAnalysisService', () => {
   it('throws not found when run does not belong to tenant', async () => {
     const service = await createService(null);
 
-    await expect(service.analyzeRunFailure('run-1', 'tenant-2')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.analyzeRunFailure('run-1', 'tenant-2'),
+    ).rejects.toThrow(NotFoundException);
   });
 });

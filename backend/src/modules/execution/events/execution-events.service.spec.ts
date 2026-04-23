@@ -4,7 +4,9 @@ import { ExecutionEventsService } from './execution-events.service';
 describe('ExecutionEventsService', () => {
   it('streams only events for the requested tenant and run', async () => {
     const service = new ExecutionEventsService();
-    const eventPromise = firstValueFrom(service.stream('tenant-1', 'run-1').pipe(skip(1), take(1)));
+    const eventPromise = firstValueFrom(
+      service.stream('tenant-1', 'run-1').pipe(skip(1), take(1)),
+    );
 
     service.emit({
       tenantId: 'tenant-2',

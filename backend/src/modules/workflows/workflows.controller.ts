@@ -11,7 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRoleEnum } from '../../common/enums/user-role.enum';
@@ -26,6 +28,8 @@ export class WorkflowsController {
   constructor(private readonly workflowsService: WorkflowsService) {}
 
   @Get()
+  @RateLimit({ points: 60, windowMs: 60_000 })
+  @UseGuards(RateLimitGuard)
   findAll(@CurrentUser() user: any, @Query() query: ListWorkflowsQueryDto) {
     return this.workflowsService.findAll(user.tenantId, query);
   }

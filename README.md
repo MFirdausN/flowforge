@@ -21,6 +21,7 @@ FlowForge is a real-time oriented, multi-tenant workflow orchestration MVP built
 - Manual trigger, webhook trigger, and cron-based scheduled trigger
 - Run tracking, step tracking, and execution logs
 - Server-Sent Events stream for realtime run and step status updates
+- In-memory rate limiting for high-read dashboard endpoints
 - Runs API with pagination and filtering
 - Health overview for active runs, success/failure rates, and average duration
 - AI failure analysis with heuristic fallback and optional LLM provider
@@ -158,23 +159,23 @@ CI runs the same checks and Docker image builds in `.github/workflows/ci.yml`.
 
 - Architecture: `docs/ARCHITECTURE.md`
 - Query optimization and EXPLAIN plan: `docs/QUERY_OPTIMIZATION.md`
+- Engineering practices and PR guidance: `docs/ENGINEERING_PRACTICES.md`
 - Code review exercise: `REVIEW.md`
 
 ## Trade-Offs
 
 - The scheduler is in-memory and checks active workflows every minute. Production should move this to a queue worker with distributed locking.
 - Execution logs currently live in PostgreSQL for query simplicity. At larger scale, logs should be partitioned or moved to an append-only log store.
-- The backend exposes SSE for run events, while the frontend still uses manual refresh for MVP simplicity.
+- The backend exposes SSE for run events and the frontend consumes it from run detail. The MVP event bus is still in-memory, so production should move it to Redis Pub/Sub or a queue-backed event transport.
 - The OpenAPI-like docs are hand-authored to avoid adding Swagger dependencies late in the MVP.
 - AI failure analysis works without an API key using deterministic heuristics. If `OPENAI_API_KEY` is present, it sends a bounded run context to an LLM and falls back to heuristics when output is malformed or the provider is unavailable.
 - Lint keeps unsafe `any` rules as warnings because JWT payloads and Prisma-heavy tests still need stronger typing.
 
 ## What I Would Improve With More Time
 
-- Add WebSocket/SSE for live step status updates
+- Add distributed SSE/WebSocket fan-out for multi-instance deployments
 - Add visual workflow builder and create/edit workflow UI
 - Implement true conditional branching with skipped downstream paths
 - Add sandboxed script execution
-- Add rate limiting and webhook HMAC validation
-- Add AI failure analysis for failed runs
+- Add webhook HMAC validation
 - Add partitioning or archival policy for high-volume logs

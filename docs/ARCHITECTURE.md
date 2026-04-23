@@ -37,6 +37,7 @@ Redis is included for future queue/worker scaling.
 - `HealthModule`: liveness and tenant execution metrics for the last 24 hours.
 - `ApiDocsModule`: admin-only local API documentation.
 - `AiModule`: failure analysis for failed runs, using heuristic fallback and optional LLM integration.
+- `RateLimitGuard`: in-memory per-user/per-route request limiting for frequently polled dashboard endpoints.
 
 ## Execution Flow
 
@@ -120,5 +121,6 @@ Choices:
 - Long-running executions should move to queue workers.
 - Logs need retention and archival policy.
 - All list endpoints should keep tenant-first indexes.
+- Rate limiting is local to one API process in the MVP. Production should use Redis-backed counters so limits remain consistent across scaled API tasks.
 - Webhooks should use HMAC signatures before production exposure.
 - AI analysis should avoid sending secrets or full payloads to external providers; current implementation truncates logs and falls back if provider output is malformed.

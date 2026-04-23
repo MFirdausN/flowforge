@@ -106,7 +106,10 @@ export class AiAnalysisService {
       .join(' ')
       .toLowerCase();
 
-    if (context.status === RunStatus.TIMEOUT || combinedError.includes('timed out')) {
+    if (
+      context.status === RunStatus.TIMEOUT ||
+      combinedError.includes('timed out')
+    ) {
       return this.toAnalysis(context, {
         likelyCause:
           'The workflow exceeded its configured timeout or a step took too long to finish.',
@@ -138,7 +141,8 @@ export class AiAnalysisService {
 
     if (combinedError.includes('unsupported step type')) {
       return this.toAnalysis(context, {
-        likelyCause: 'The workflow definition contains a step type that the engine cannot execute yet.',
+        likelyCause:
+          'The workflow definition contains a step type that the engine cannot execute yet.',
         suggestedFix:
           'Change the step type to a supported type (`http`, `delay`, `condition`) or implement the missing step handler.',
         confidence: 'high',
@@ -154,7 +158,9 @@ export class AiAnalysisService {
     });
   }
 
-  private async tryAnalyzeWithLlm(context: any): Promise<FailureAnalysis | null> {
+  private async tryAnalyzeWithLlm(
+    context: any,
+  ): Promise<FailureAnalysis | null> {
     const apiKey = process.env.OPENAI_API_KEY;
     const model = process.env.OPENAI_MODEL ?? 'gpt-4.1-mini';
 
@@ -182,7 +188,7 @@ export class AiAnalysisService {
         return null;
       }
 
-      const payload = (await response.json()) as any;
+      const payload = await response.json();
       const text = this.extractResponseText(payload);
       const parsed = this.safeParseJson(text);
 
@@ -224,7 +230,10 @@ ${JSON.stringify(context).slice(0, 6000)}`;
 
   private toAnalysis(
     context: any,
-    result: Pick<FailureAnalysis, 'likelyCause' | 'suggestedFix' | 'confidence'>,
+    result: Pick<
+      FailureAnalysis,
+      'likelyCause' | 'suggestedFix' | 'confidence'
+    >,
   ): FailureAnalysis {
     return {
       source: 'heuristic',
