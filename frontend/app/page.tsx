@@ -99,7 +99,8 @@ type ExecutionSseEvent = {
     | "step.running"
     | "step.retrying"
     | "step.succeeded"
-    | "step.failed";
+    | "step.failed"
+    | "step.skipped";
   data: {
     stepRecordId?: string;
     stepId?: string;

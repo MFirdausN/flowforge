@@ -16,6 +16,7 @@ export interface WorkflowNode {
 export interface WorkflowEdge {
   from: string;
   to: string;
+  condition?: boolean;
 }
 
 export interface WorkflowDefinition {

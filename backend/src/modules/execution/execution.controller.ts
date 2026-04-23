@@ -1,12 +1,15 @@
 import {
   Body,
   Controller,
+  Headers,
   MessageEvent,
   Param,
   Post,
   Sse,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -35,7 +38,10 @@ export class ExecutionController {
     @Param('tenantSlug') tenantSlug: string,
     @Param('workflowId') workflowId: string,
     @Body() payload: Record<string, any>,
+    @Headers('x-flowforge-signature') signature?: string,
   ) {
+    this.verifyWebhookSignature(payload, signature);
+
     return this.workflowExecutor.executeWebhookWorkflow(
       tenantSlug,
       workflowId,
@@ -50,5 +56,28 @@ export class ExecutionController {
     @CurrentUser() user: any,
   ): Observable<MessageEvent> {
     return this.executionEventsService.stream(user.tenantId, runId);
+  }
+
+  private verifyWebhookSignature(
+    payload: Record<string, any>,
+    signature?: string,
+  ) {
+    const secret = process.env.WEBHOOK_SECRET;
+
+    if (!secret) return;
+
+    const expected = createHmac('sha256', secret)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+    const normalizedSignature = signature?.replace(/^sha256=/, '') ?? '';
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    const receivedBuffer = Buffer.from(normalizedSignature, 'hex');
+
+    if (
+      expectedBuffer.length !== receivedBuffer.length ||
+      !timingSafeEqual(expectedBuffer, receivedBuffer)
+    ) {
+      throw new UnauthorizedException('Invalid webhook signature');
+    }
   }
 }

@@ -63,6 +63,9 @@ describe('WorkflowExecutor', () => {
     const httpStep = overrides.httpStep ?? {
       execute: jest.fn().mockResolvedValue({ ok: true }),
     };
+    const scriptStep = overrides.scriptStep ?? {
+      execute: jest.fn().mockResolvedValue({ result: 1 }),
+    };
     const executionEventsService =
       overrides.executionEventsService ??
       ({
@@ -81,6 +84,7 @@ describe('WorkflowExecutor', () => {
         httpStep,
         { execute: jest.fn().mockResolvedValue({ delayed: 1 }) },
         { execute: jest.fn().mockResolvedValue({ result: true }) },
+        scriptStep,
         executionEventsService as ExecutionEventsService,
       ),
     };
@@ -190,6 +194,7 @@ describe('WorkflowExecutor', () => {
         execute: () => new Promise((resolve) => setTimeout(resolve, 50)),
       } as any,
       { execute: jest.fn() },
+      { execute: jest.fn() },
       { emit: jest.fn() } as any,
     );
 
@@ -240,5 +245,101 @@ describe('WorkflowExecutor', () => {
         sub: 'user-1',
       }),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('skips the non-matching conditional branch', async () => {
+    const conditionalDefinition: WorkflowDefinition = {
+      name: 'Conditional workflow',
+      timeout_ms: 1_000,
+      nodes: [
+        {
+          id: 'check',
+          name: 'Check value',
+          type: 'condition',
+          config: { value: true },
+        },
+        {
+          id: 'true-branch',
+          name: 'True branch',
+          type: 'delay',
+          config: { ms: 1 },
+        },
+        {
+          id: 'false-branch',
+          name: 'False branch',
+          type: 'delay',
+          config: { ms: 1 },
+        },
+      ],
+      edges: [
+        { from: 'check', to: 'true-branch', condition: true },
+        { from: 'check', to: 'false-branch', condition: false },
+      ],
+    };
+    const prisma = createPrismaMock();
+    prisma.workflow.findFirst.mockResolvedValue({
+      id: 'workflow-1',
+      tenantId: 'tenant-1',
+      versions: [{ id: 'version-1', definitionJson: conditionalDefinition }],
+    });
+    const { executor } = createExecutor({ prisma });
+
+    await executor.executeWorkflow('workflow-1', {
+      tenantId: 'tenant-1',
+      sub: 'user-1',
+    });
+
+    expect(prisma.workflowRunStep.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          stepId: 'false-branch',
+          status: StepStatus.SKIPPED,
+        }),
+      }),
+    );
+  });
+
+  it('executes sandboxed script steps', async () => {
+    const scriptStep = { execute: jest.fn().mockResolvedValue({ result: 42 }) };
+    const scriptDefinition: WorkflowDefinition = {
+      name: 'Script workflow',
+      timeout_ms: 1_000,
+      nodes: [
+        {
+          id: 'calculate',
+          name: 'Calculate',
+          type: 'script',
+          config: { code: 'result = input.value * 2;', input: { value: 21 } },
+        },
+      ],
+      edges: [],
+    };
+    const prisma = createPrismaMock();
+    prisma.workflow.findFirst.mockResolvedValue({
+      id: 'workflow-1',
+      tenantId: 'tenant-1',
+      versions: [{ id: 'version-1', definitionJson: scriptDefinition }],
+    });
+    const executor = new WorkflowExecutor(
+      prisma as any,
+      new DagValidator(),
+      new CycleDetector(),
+      new TopologicalSort(),
+      { execute: jest.fn() },
+      { execute: jest.fn() },
+      { execute: jest.fn() },
+      scriptStep,
+      { emit: jest.fn() } as any,
+    );
+
+    await executor.executeWorkflow('workflow-1', {
+      tenantId: 'tenant-1',
+      sub: 'user-1',
+    });
+
+    expect(scriptStep.execute).toHaveBeenCalledWith({
+      code: 'result = input.value * 2;',
+      input: { value: 21 },
+    });
   });
 });

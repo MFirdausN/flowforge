@@ -17,8 +17,9 @@ FlowForge is a real-time oriented, multi-tenant workflow orchestration MVP built
 - DAG validation, cycle detection, and topological sorting
 - Execution engine with dependency-aware parallel layers
 - Retry with exponential backoff and global workflow timeout
-- Step types: `http`, `delay`, `condition`
+- Step types: `http`, `delay`, `condition`, `script`
 - Manual trigger, webhook trigger, and cron-based scheduled trigger
+- Optional webhook HMAC validation with `WEBHOOK_SECRET`
 - Run tracking, step tracking, and execution logs
 - Server-Sent Events stream for realtime run and step status updates
 - In-memory rate limiting for high-read dashboard endpoints
@@ -126,9 +127,33 @@ The docs endpoint is intentionally protected with `ADMIN` role access because it
       "config": {
         "ms": 500
       }
+    },
+    {
+      "id": "check",
+      "name": "Check branch",
+      "type": "condition",
+      "config": {
+        "value": true
+      }
+    },
+    {
+      "id": "calculate",
+      "name": "Sandboxed script",
+      "type": "script",
+      "config": {
+        "code": "result = input.count * 2;",
+        "input": {
+          "count": 21
+        },
+        "timeout_ms": 1000
+      }
     }
   ],
-  "edges": [{ "from": "fetch", "to": "wait" }]
+  "edges": [
+    { "from": "fetch", "to": "wait" },
+    { "from": "wait", "to": "check" },
+    { "from": "check", "to": "calculate", "condition": true }
+  ]
 }
 ```
 
@@ -175,7 +200,6 @@ CI runs the same checks and Docker image builds in `.github/workflows/ci.yml`.
 
 - Add distributed SSE/WebSocket fan-out for multi-instance deployments
 - Add visual workflow builder and create/edit workflow UI
-- Implement true conditional branching with skipped downstream paths
-- Add sandboxed script execution
-- Add webhook HMAC validation
+- Add Redis-backed queues for execution workers
+- Add richer branch expressions beyond boolean condition edges
 - Add partitioning or archival policy for high-volume logs

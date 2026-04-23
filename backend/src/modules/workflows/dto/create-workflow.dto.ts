@@ -6,6 +6,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsBoolean,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -49,6 +50,10 @@ class EdgeDto {
 
   @IsString()
   to: string;
+
+  @IsOptional()
+  @IsBoolean()
+  condition?: boolean;
 }
 
 class ScheduleDto {

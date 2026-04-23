@@ -45,6 +45,7 @@ services:
       PORT: 3001
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/flowforge
       JWT_SECRET: ${JWT_SECRET:-flowforge-local-secret}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:

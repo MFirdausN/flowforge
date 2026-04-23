@@ -11,6 +11,7 @@ import {
 import { HttpStep } from '../steps/http.step';
 import { DelayStep } from '../steps/delay.step';
 import { ConditionStep } from '../steps/condition.step';
+import { ScriptStep } from '../steps/script.step';
 import { RunStatus, StepStatus } from '@prisma/client';
 import { serializeBigInt } from '../../../common/utils/serialize-bigint';
 import { ExecutionEventsService } from '../events/execution-events.service';
@@ -27,6 +28,10 @@ interface ExecuteWorkflowOptions {
   inputPayload?: Record<string, any>;
 }
 
+type NodeExecutionResult = {
+  output: Record<string, any>;
+};
+
 @Injectable()
 export class WorkflowExecutor {
   constructor(
@@ -37,6 +42,7 @@ export class WorkflowExecutor {
     private readonly httpStep: HttpStep,
     private readonly delayStep: DelayStep,
     private readonly conditionStep: ConditionStep,
+    private readonly scriptStep: ScriptStep,
     private readonly executionEventsService: ExecutionEventsService,
   ) {}
 
@@ -207,15 +213,24 @@ export class WorkflowExecutor {
     const nodesById = new Map(sortedNodes.map((node) => [node.id, node]));
     const inDegree = new Map<string, number>();
     const dependents = new Map<string, string[]>();
+    const incoming = new Map<string, string[]>();
+    const edgesByKey = new Map(
+      definition.edges.map((edge) => [`${edge.from}->${edge.to}`, edge]),
+    );
+    const skipped = new Set<string>();
+    const blockedEdges = new Set<string>();
+    const outputs = new Map<string, Record<string, any>>();
 
     for (const node of sortedNodes) {
       inDegree.set(node.id, 0);
       dependents.set(node.id, []);
+      incoming.set(node.id, []);
     }
 
     for (const edge of definition.edges) {
       inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1);
       dependents.get(edge.from)?.push(edge.to);
+      incoming.get(edge.to)?.push(edge.from);
     }
 
     const ready = sortedNodes
@@ -231,13 +246,14 @@ export class WorkflowExecutor {
         currentLayerIds.map(async (nodeId) => {
           const node = nodesById.get(nodeId)!;
 
-          await this.executeNode(
+          const result = await this.executeNode(
             runId,
             tenantId,
             node,
             deadlineAt,
             definition.timeout_ms,
           );
+          outputs.set(nodeId, result.output);
 
           return nodeId;
         }),
@@ -247,6 +263,33 @@ export class WorkflowExecutor {
         completedCount += 1;
 
         for (const dependentId of dependents.get(nodeId) ?? []) {
+          const edgeKey = `${nodeId}->${dependentId}`;
+          const edge = edgesByKey.get(edgeKey);
+
+          if (
+            edge?.condition !== undefined &&
+            Boolean(outputs.get(nodeId)?.result) !== edge.condition
+          ) {
+            blockedEdges.add(edgeKey);
+
+            if (
+              this.shouldSkipNode(dependentId, incoming, skipped, blockedEdges)
+            ) {
+              await this.skipNodeAndDependents(
+                dependentId,
+                runId,
+                tenantId,
+                nodesById,
+                incoming,
+                dependents,
+                skipped,
+                blockedEdges,
+              );
+            }
+
+            continue;
+          }
+
           inDegree.set(dependentId, (inDegree.get(dependentId) ?? 0) - 1);
 
           if (inDegree.get(dependentId) === 0) {
@@ -256,8 +299,90 @@ export class WorkflowExecutor {
       }
     }
 
-    if (completedCount !== sortedNodes.length) {
+    if (completedCount + skipped.size !== sortedNodes.length) {
       throw new Error('Workflow execution stopped before all nodes completed');
+    }
+  }
+
+  private shouldSkipNode(
+    nodeId: string,
+    incoming: Map<string, string[]>,
+    skipped: Set<string>,
+    blockedEdges: Set<string>,
+  ) {
+    const incomingSources = incoming.get(nodeId) ?? [];
+
+    return incomingSources.every(
+      (sourceId) =>
+        skipped.has(sourceId) || blockedEdges.has(`${sourceId}->${nodeId}`),
+    );
+  }
+
+  private async skipNodeAndDependents(
+    nodeId: string,
+    runId: string,
+    tenantId: string,
+    nodesById: Map<string, WorkflowNode>,
+    incoming: Map<string, string[]>,
+    dependents: Map<string, string[]>,
+    skipped: Set<string>,
+    blockedEdges: Set<string>,
+  ) {
+    if (skipped.has(nodeId)) return;
+
+    const node = nodesById.get(nodeId);
+    if (!node) return;
+
+    skipped.add(nodeId);
+
+    const stepRecord = await this.prisma.workflowRunStep.create({
+      data: {
+        workflowRunId: runId,
+        tenantId,
+        stepId: node.id,
+        stepType: node.type,
+        status: StepStatus.SKIPPED,
+        attemptNo: 0,
+      },
+    });
+
+    this.executionEventsService.emit({
+      tenantId,
+      runId,
+      type: 'step.skipped',
+      data: {
+        stepRecordId: stepRecord.id,
+        stepId: node.id,
+        stepType: node.type,
+        status: StepStatus.SKIPPED,
+      },
+    });
+
+    await this.prisma.executionLog.create({
+      data: {
+        tenantId,
+        workflowRunId: runId,
+        workflowRunStepId: stepRecord.id,
+        level: 'INFO',
+        message: `Step ${node.name} skipped by conditional branch`,
+      },
+    });
+
+    for (const dependentId of dependents.get(nodeId) ?? []) {
+      blockedEdges.add(`${nodeId}->${dependentId}`);
+
+      if (this.shouldSkipNode(dependentId, incoming, skipped, blockedEdges)) {
+        await this.skipNodeAndDependents(
+          dependentId,
+          runId,
+          tenantId,
+          nodesById,
+          incoming,
+          dependents,
+          skipped,
+          blockedEdges,
+        );
+      }
     }
   }
 
@@ -267,7 +392,7 @@ export class WorkflowExecutor {
     node: WorkflowNode,
     deadlineAt: number,
     workflowTimeoutMs: number,
-  ) {
+  ): Promise<NodeExecutionResult> {
     const stepRecord = await this.prisma.workflowRunStep.create({
       data: {
         workflowRunId: runId,
@@ -343,6 +468,8 @@ export class WorkflowExecutor {
           meta: result.output,
         },
       });
+
+      return { output: result.output };
     } catch (error: any) {
       const finishedAt = new Date();
 
@@ -468,8 +595,12 @@ export class WorkflowExecutor {
         return this.delayStep.execute(node.config);
       case 'condition':
         return this.conditionStep.execute(node.config);
+      case 'script':
+        return this.scriptStep.execute(node.config);
       default:
-        throw new Error(`Unsupported step type: ${node.type}`);
+        throw new Error(
+          `Unsupported step type: ${(node as { type: string }).type}`,
+        );
     }
   }
 

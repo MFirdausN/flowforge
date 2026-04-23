@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { WorkflowDefinition } from './dag.types';
+import { WorkflowDefinition, WorkflowNode } from './dag.types';
 
 @Injectable()
 export class DagValidator {
@@ -17,6 +17,7 @@ export class DagValidator {
     }
 
     const nodeIds = new Set<string>();
+    const nodesById = new Map<string, WorkflowNode>();
 
     for (const node of definition.nodes) {
       if (!node.id || !node.name || !node.type) {
@@ -28,6 +29,7 @@ export class DagValidator {
       }
 
       nodeIds.add(node.id);
+      nodesById.set(node.id, node);
     }
 
     for (const edge of definition.edges) {
@@ -47,6 +49,15 @@ export class DagValidator {
 
       if (edge.from === edge.to) {
         throw new BadRequestException(`Self-loop is not allowed: ${edge.from}`);
+      }
+
+      if (
+        edge.condition !== undefined &&
+        nodesById.get(edge.from)?.type !== 'condition'
+      ) {
+        throw new BadRequestException(
+          `Conditional edge must start from a condition node: ${edge.from}`,
+        );
       }
     }
   }

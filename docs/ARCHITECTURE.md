@@ -47,10 +47,11 @@ Redis is included for future queue/worker scaling.
 4. Definition is validated as a DAG.
 5. Engine computes dependency layers using in-degree tracking.
 6. Steps in the same ready layer execute in parallel.
-7. Each step creates a `workflow_run_steps` record.
-8. Retry/backoff is applied per node.
-9. Logs are written to `execution_logs`.
-10. Run finishes as `SUCCEEDED`, `FAILED`, or `TIMEOUT`.
+7. Condition nodes may route through boolean `condition` edges and mark non-matching downstream paths as `SKIPPED`.
+8. Each step creates a `workflow_run_steps` record.
+9. Retry/backoff is applied per node.
+10. Logs are written to `execution_logs`.
+11. Run finishes as `SUCCEEDED`, `FAILED`, or `TIMEOUT`.
 
 ## Multi-Tenant Isolation
 
@@ -123,4 +124,5 @@ Choices:
 - All list endpoints should keep tenant-first indexes.
 - Rate limiting is local to one API process in the MVP. Production should use Redis-backed counters so limits remain consistent across scaled API tasks.
 - Webhooks should use HMAC signatures before production exposure.
+- The MVP supports optional webhook HMAC validation through `WEBHOOK_SECRET` and `x-flowforge-signature`.
 - AI analysis should avoid sending secrets or full payloads to external providers; current implementation truncates logs and falls back if provider output is malformed.

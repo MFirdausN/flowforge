@@ -9,7 +9,8 @@ export type ExecutionEventType =
   | 'step.running'
   | 'step.retrying'
   | 'step.succeeded'
-  | 'step.failed';
+  | 'step.failed'
+  | 'step.skipped';
 
 export type ExecutionEvent = {
   tenantId: string;

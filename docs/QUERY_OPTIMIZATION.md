@@ -27,6 +27,12 @@ This supports tenant filtering and chronological ordering. PostgreSQL can scan t
 
 ## Expected EXPLAIN Plan
 
+Run the local verification script after migrations and seed data:
+
+```bash
+psql "$DATABASE_URL" -f docs/sql/explain-run-history.sql
+```
+
 Representative plan for a tenant with many runs:
 
 ```text
