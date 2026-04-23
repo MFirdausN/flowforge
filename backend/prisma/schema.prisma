@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  TIMEOUT
+  CANCELED
+}
+
+enum StepStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  workflows     Workflow[]
+  workflowRuns  WorkflowRun[]
+  runSteps      WorkflowRunStep[]
+  executionLogs ExecutionLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdWorkflows Workflow[]        @relation("WorkflowCreatedBy")
+  updatedWorkflows Workflow[]        @relation("WorkflowUpdatedBy")
+  createdVersions  WorkflowVersion[] @relation("WorkflowVersionCreatedBy")
+  createdRuns      WorkflowRun[]     @relation("WorkflowRunCreatedBy")
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Workflow {
+  id               String         @id @default(uuid())
+  tenantId         String
+  name             String
+  description      String?
+  status           WorkflowStatus @default(DRAFT)
+  currentVersionNo Int            @default(1)
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?             @relation("WorkflowCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?             @relation("WorkflowUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  versions  WorkflowVersion[]
+  runs      WorkflowRun[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@map("workflows")
+}
+
+model WorkflowVersion {
+  id             String   @id @default(uuid())
+  workflowId     String
+  tenantId       String
+  versionNo      Int
+  definitionJson Json
+  checksum       String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  workflow  Workflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  createdBy User?         @relation("WorkflowVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  runs      WorkflowRun[]
+
+  @@unique([workflowId, versionNo])
+  @@index([workflowId])
+  @@index([tenantId])
+  @@map("workflow_versions")
+}
+
+model WorkflowRun {
+  id                String    @id @default(uuid())
+  workflowId        String
+  workflowVersionId String
+  tenantId          String
+  triggerType       String
+  status            RunStatus @default(PENDING)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  durationMs        Int?
+  inputPayload      Json?
+  outputPayload     Json?
+  errorMessage      String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+
+  workflow        Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion WorkflowVersion   @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy       User?             @relation("WorkflowRunCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  steps           WorkflowRunStep[]
+  logs            ExecutionLog[]
+
+  @@index([tenantId])
+  @@index([workflowId])
+  @@index([tenantId, createdAt])
+  @@map("workflow_runs")
+}
+
+model WorkflowRunStep {
+  id            String     @id @default(uuid())
+  workflowRunId String
+  tenantId      String
+  stepId        String
+  stepType      String
+  status        StepStatus @default(PENDING)
+  attemptNo     Int        @default(0)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  durationMs    Int?
+  inputPayload  Json?
+  outputPayload Json?
+  errorMessage  String?
+  createdAt     DateTime   @default(now())
+
+  workflowRun WorkflowRun    @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logs        ExecutionLog[]
+
+  @@index([workflowRunId])
+  @@index([tenantId])
+  @@index([workflowRunId, stepId])
+  @@map("workflow_run_steps")
+}
+
+model ExecutionLog {
+  id                BigInt   @id @default(autoincrement())
+  tenantId          String
+  workflowRunId     String
+  workflowRunStepId String?
+  level             LogLevel
+  message           String
+  meta              Json?
+  createdAt         DateTime @default(now())
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflowRun     WorkflowRun      @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowRunStep WorkflowRunStep? @relation(fields: [workflowRunStepId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([workflowRunId, createdAt])
+  @@index([workflowRunStepId])
+  @@map("execution_logs")
+}
