@@ -51,6 +51,12 @@ class EdgeDto {
   to: string;
 }
 
+class ScheduleDto {
+  @IsString()
+  @IsNotEmpty()
+  cron: string;
+}
+
 class DefinitionDto {
   @IsString()
   name: string;
@@ -58,6 +64,11 @@ class DefinitionDto {
   @IsInt()
   @Min(1000)
   timeout_ms: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ScheduleDto)
+  schedule?: ScheduleDto;
 
   @IsArray()
   @ValidateNested({ each: true })

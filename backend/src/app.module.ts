@@ -7,6 +7,8 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { RunsModule } from './modules/runs/runs.module';
 import { ExecutionModule } from './modules/execution/execution.module';
 import { HealthModule } from './modules/health/health.module';
+import { ApiDocsModule } from './modules/api-docs/api-docs.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { HealthModule } from './modules/health/health.module';
     RunsModule,
     ExecutionModule,
     HealthModule,
+    ApiDocsModule,
+    AiModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

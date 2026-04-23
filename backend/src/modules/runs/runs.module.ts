@@ -4,6 +4,6 @@ import { RunsService } from './runs.service';
 
 @Module({
   controllers: [RunsController],
-  providers: [RunsService]
+  providers: [RunsService],
 })
 export class RunsModule {}

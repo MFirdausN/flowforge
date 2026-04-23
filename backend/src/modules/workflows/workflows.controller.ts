@@ -1,44 +1,74 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Post,
-    Put,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { UserRoleEnum } from '../../common/enums/user-role.enum';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
+import { ListWorkflowsQueryDto } from './dto/list-workflows-query.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { WorkflowsService } from './workflows.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('workflows')
 export class WorkflowsController {
-    constructor(private readonly workflowsService: WorkflowsService) { }
+  constructor(private readonly workflowsService: WorkflowsService) {}
 
-    @Get()
-    findAll(@CurrentUser() user: any) {
-        return this.workflowsService.findAll(user.tenantId);
-    }
+  @Get()
+  findAll(@CurrentUser() user: any, @Query() query: ListWorkflowsQueryDto) {
+    return this.workflowsService.findAll(user.tenantId, query);
+  }
 
-    @Get(':id')
-    findOne(@Param('id') id: string, @CurrentUser() user: any) {
-        return this.workflowsService.findOne(id, user.tenantId);
-    }
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.workflowsService.findOne(id, user.tenantId);
+  }
 
-    @Post()
-    create(@Body() dto: CreateWorkflowDto, @CurrentUser() user: any) {
-        return this.workflowsService.create(dto, user);
-    }
+  @Get(':id/versions')
+  findVersions(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.workflowsService.findVersions(id, user.tenantId);
+  }
 
-    @Put(':id')
-    update(
-        @Param('id') id: string,
-        @Body() dto: UpdateWorkflowDto,
-        @CurrentUser() user: any,
-    ) {
-        return this.workflowsService.update(id, dto, user);
-    }
+  @Post()
+  @Roles(UserRoleEnum.ADMIN, UserRoleEnum.EDITOR)
+  create(@Body() dto: CreateWorkflowDto, @CurrentUser() user: any) {
+    return this.workflowsService.create(dto, user);
+  }
+
+  @Put(':id')
+  @Roles(UserRoleEnum.ADMIN, UserRoleEnum.EDITOR)
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkflowDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.workflowsService.update(id, dto, user);
+  }
+
+  @Post(':id/rollback/:versionNo')
+  @Roles(UserRoleEnum.ADMIN, UserRoleEnum.EDITOR)
+  rollback(
+    @Param('id') id: string,
+    @Param('versionNo', ParseIntPipe) versionNo: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.workflowsService.rollback(id, versionNo, user);
+  }
+
+  @Delete(':id')
+  @Roles(UserRoleEnum.ADMIN)
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.workflowsService.remove(id, user);
+  }
 }
