@@ -12,7 +12,7 @@ describe('FlowForge API (e2e)', () => {
   let app: INestApplication<App>;
   let adminToken: string;
   let editorToken: string;
-  let viewerToken: string;
+  let userToken: string;
 
   const workflowDefinition = {
     name: 'Webhook sync',
@@ -53,13 +53,13 @@ describe('FlowForge API (e2e)', () => {
         isActive: true,
         tenant: { id: 'tenant-1', name: 'Tenant One', slug: 'tenant1' },
       },
-      'viewer@tenant1.local': {
-        id: 'viewer-1',
+      'user@tenant1.local': {
+        id: 'user-1',
         tenantId: 'tenant-1',
-        name: 'Viewer',
-        email: 'viewer@tenant1.local',
+        name: 'User',
+        email: 'user@tenant1.local',
         passwordHash,
-        role: 'VIEWER',
+        role: 'USER',
         isActive: true,
         tenant: { id: 'tenant-1', name: 'Tenant One', slug: 'tenant1' },
       },
@@ -161,7 +161,7 @@ describe('FlowForge API (e2e)', () => {
 
     adminToken = await login('admin@tenant1.local');
     editorToken = await login('editor@tenant1.local');
-    viewerToken = await login('viewer@tenant1.local');
+    userToken = await login('user@tenant1.local');
   });
 
   afterAll(async () => {
@@ -174,7 +174,7 @@ describe('FlowForge API (e2e)', () => {
       .send({ email, password: 'password123' })
       .expect(201);
 
-    return response.body.access_token;
+    return response.body.accessToken;
   };
 
   it('protects local API docs with admin-only JWT access', async () => {
@@ -182,7 +182,7 @@ describe('FlowForge API (e2e)', () => {
 
     await request(app.getHttpServer())
       .get('/docs/openapi.json')
-      .set('Authorization', `Bearer ${viewerToken}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .expect(403);
 
     const response = await request(app.getHttpServer())
@@ -218,10 +218,10 @@ describe('FlowForge API (e2e)', () => {
       .expect(400);
   });
 
-  it('enforces viewer read-only access for workflow mutations', async () => {
+  it('enforces user read-only access for workflow mutations', async () => {
     await request(app.getHttpServer())
       .post('/workflows')
-      .set('Authorization', `Bearer ${viewerToken}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .send({
         name: 'Denied workflow',
         definition: workflowDefinition,
@@ -230,7 +230,7 @@ describe('FlowForge API (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .get('/workflows?page=1&limit=10&status=ACTIVE&search=Webhook')
-      .set('Authorization', `Bearer ${viewerToken}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .expect(200);
 
     expect(response.body.meta.total).toBe(1);
@@ -240,7 +240,7 @@ describe('FlowForge API (e2e)', () => {
   it('supports version rollback and admin-only delete', async () => {
     await request(app.getHttpServer())
       .get('/workflows/workflow-1/versions')
-      .set('Authorization', `Bearer ${viewerToken}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .expect(200);
 
     await request(app.getHttpServer())
@@ -262,7 +262,7 @@ describe('FlowForge API (e2e)', () => {
   it('supports protected manual triggers and public webhook triggers', async () => {
     await request(app.getHttpServer())
       .post('/execution/trigger/workflow-1')
-      .set('Authorization', `Bearer ${viewerToken}`)
+      .set('Authorization', `Bearer ${userToken}`)
       .expect(403);
 
     await request(app.getHttpServer())

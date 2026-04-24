@@ -9,7 +9,13 @@ datasource db {
 enum UserRole {
   ADMIN
   EDITOR
-  VIEWER
+  USER
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
 }
 
 enum WorkflowStatus {
@@ -49,6 +55,7 @@ model Tenant {
   updatedAt DateTime @updatedAt
 
   users         User[]
+  posts         Post[]
   workflows     Workflow[]
   workflowRuns  WorkflowRun[]
   runSteps      WorkflowRunStep[]
@@ -69,6 +76,8 @@ model User {
   updatedAt    DateTime @updatedAt
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts            Post[]            @relation("PostAuthor")
+  reviewedPosts    Post[]            @relation("PostReviewer")
   createdWorkflows Workflow[]        @relation("WorkflowCreatedBy")
   updatedWorkflows Workflow[]        @relation("WorkflowUpdatedBy")
   createdVersions  WorkflowVersion[] @relation("WorkflowVersionCreatedBy")
@@ -99,6 +108,31 @@ model Workflow {
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@map("workflows")
+}
+
+model Post {
+  id            String     @id @default(uuid())
+  tenantId      String
+  authorId      String
+  reviewerId    String?
+  title         String
+  slug          String
+  excerpt       String?
+  content       String
+  status        PostStatus @default(DRAFT)
+  publishedAt   DateTime?
+  reviewedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  author   User   @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reviewer User?  @relation("PostReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status, publishedAt])
+  @@index([authorId])
+  @@map("posts")
 }
 
 model WorkflowVersion {

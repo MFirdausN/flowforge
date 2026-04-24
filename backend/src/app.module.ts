@@ -9,6 +9,7 @@ import { ExecutionModule } from './modules/execution/execution.module';
 import { HealthModule } from './modules/health/health.module';
 import { ApiDocsModule } from './modules/api-docs/api-docs.module';
 import { AiModule } from './modules/ai/ai.module';
+import { PostsModule } from './modules/posts/posts.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AiModule } from './modules/ai/ai.module';
     HealthModule,
     ApiDocsModule,
     AiModule,
+    PostsModule,
   ],
 })
 export class AppModule {}

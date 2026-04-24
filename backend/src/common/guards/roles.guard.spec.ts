@@ -43,7 +43,7 @@ describe('RolesGuard', () => {
     } as unknown as Reflector;
     const guard = new RolesGuard(reflector);
 
-    expect(() => guard.canActivate(createContext(UserRoleEnum.VIEWER))).toThrow(
+    expect(() => guard.canActivate(createContext(UserRoleEnum.USER))).toThrow(
       ForbiddenException,
     );
   });

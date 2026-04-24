@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: flowforge
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${FLOWFORGE_POSTGRES_PORT:-15432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     container_name: flowforge_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${FLOWFORGE_REDIS_PORT:-16379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -44,19 +44,19 @@ services:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/flowforge
-      JWT_SECRET: ${JWT_SECRET:-flowforge-local-secret}
+      JWT_SECRET: ${JWT_SECRET:-change-this-local-secret}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
-      - "3001:3001"
+      - "127.0.0.1:${FLOWFORGE_BACKEND_PORT:-13001}:3001"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:13001}
     container_name: flowforge_frontend
     restart: unless-stopped
     depends_on:
@@ -64,9 +64,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:13001}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${FLOWFORGE_FRONTEND_PORT:-13000}:3000"
 
 volumes:
   postgres_data:

@@ -32,15 +32,27 @@ FlowForge is a real-time oriented, multi-tenant workflow orchestration MVP built
 ## Quick Start With Docker
 
 ```bash
-docker compose up --build
+Copy-Item .env.example .env
+docker compose up --build -d
 ```
 
 Services:
 
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:3001`
-- Postgres: `localhost:5432`
-- Redis: `localhost:6379`
+- Frontend: `http://127.0.0.1:13000`
+- Backend API: `http://127.0.0.1:13001`
+- Postgres: `127.0.0.1:15432`
+- Redis: `127.0.0.1:16379`
+
+All published ports are bound to `127.0.0.1` by default so they are reachable only from the same machine, not from other devices on the local network.
+
+You can change the host ports safely in `.env`:
+
+```bash
+FLOWFORGE_FRONTEND_PORT=13000
+FLOWFORGE_BACKEND_PORT=13001
+FLOWFORGE_POSTGRES_PORT=15432
+FLOWFORGE_REDIS_PORT=16379
+```
 
 The backend container runs `prisma migrate deploy` before starting the API. To seed demo users after containers are up:
 
