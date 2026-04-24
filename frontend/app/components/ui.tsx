@@ -10,7 +10,7 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="surface-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="border-b border-slate-100 pb-4">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
           {eyebrow}
@@ -53,7 +53,7 @@ export function InfoTile({
   value: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="surface-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
         {label}
       </p>
@@ -81,8 +81,25 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-bold text-slate-500">
+    <div className="surface-panel rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-bold text-slate-500">
       {text}
+    </div>
+  );
+}
+
+export function ScorePill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-slate-950">{value}</p>
     </div>
   );
 }

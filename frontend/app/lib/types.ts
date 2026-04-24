@@ -13,6 +13,32 @@ export type ApiUser = {
 
 export type BlogPostStatus = "DRAFT" | "PENDING_REVIEW" | "PUBLISHED";
 
+export type ContentReview = {
+  source: "heuristic" | "llm";
+  seo: {
+    score: number;
+    titleLengthOk: boolean;
+    excerptLengthOk: boolean;
+    keywordDensity: "low" | "balanced" | "high";
+    notes: string[];
+  };
+  plagiarism: {
+    risk: "low" | "medium" | "high";
+    score: number;
+    repeatedSentenceCount: number;
+    notes: string[];
+  };
+  sensitiveContent: {
+    risk: "low" | "medium" | "high";
+    score: number;
+    categories: string[];
+    notes: string[];
+  };
+  summary: string;
+  recommendation: "approve" | "review" | "revise";
+  checkedAt: string;
+};
+
 export type BlogPost = {
   id: string;
   title: string;
@@ -25,7 +51,10 @@ export type BlogPost = {
   createdAt: string;
   updatedAt: string;
   author: { id: string; name: string; role: UserRole };
+  tenant?: { id: string; name: string; slug: string };
   reviewer?: { id: string; name: string; role: UserRole } | null;
+  contentReview?: ContentReview | null;
+  reviewCheckedAt?: string | null;
 };
 
 export type ManagedUser = {

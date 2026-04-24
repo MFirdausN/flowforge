@@ -62,7 +62,7 @@ export default function PublicPostDetailPage() {
         }}
       />
 
-      <section className="px-6 py-12">
+      <section className="px-5 py-12 sm:px-6">
         <div className="mx-auto max-w-4xl">
           <Link
             href="/"
@@ -85,7 +85,7 @@ export default function PublicPostDetailPage() {
           )}
 
           {!isLoading && post && (
-            <article className="mt-8 rounded-[2.5rem] border border-stone-200 bg-white p-8 shadow-xl shadow-stone-900/5 md:p-12">
+            <article className="surface-panel motion-fade mt-8 rounded-[2.5rem] border border-stone-200 bg-white p-6 shadow-xl shadow-stone-900/5 sm:p-8 md:p-12">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-full bg-amber-300 px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-stone-950">
                   {post.author.role}
@@ -100,6 +100,11 @@ export default function PublicPostDetailPage() {
               <div className="mt-6 rounded-[1.75rem] bg-stone-100 p-5">
                 <p className="text-sm font-bold text-stone-900">{post.author.name}</p>
                 <p className="mt-1 text-sm text-stone-500">/{post.slug}</p>
+                {post.tenant && (
+                  <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
+                    {post.tenant.name}
+                  </p>
+                )}
                 {post.excerpt && (
                   <p className="mt-4 text-base leading-8 text-stone-700">{post.excerpt}</p>
                 )}

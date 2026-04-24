@@ -22,12 +22,12 @@ export class PostsController {
 
   @Get('published')
   findPublished() {
-    return this.postsService.listPublished('tenant1');
+    return this.postsService.listPublished();
   }
 
   @Get('published/:slug')
   findPublishedBySlug(@Param('slug') slug: string) {
-    return this.postsService.findPublishedBySlug('tenant1', slug);
+    return this.postsService.findPublishedBySlug(slug);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

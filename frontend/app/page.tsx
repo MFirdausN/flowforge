@@ -76,7 +76,9 @@ export default function HomePage() {
 
       writeSession({ token: session.accessToken, user: session.user });
       setUser(session.user);
+      await loadPublicPosts();
       setMessage(`Welcome, ${session.user.name}`);
+      router.push("/");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication failed");
     } finally {
@@ -95,22 +97,22 @@ export default function HomePage() {
         }}
       />
 
-      <section id="hero" className="relative overflow-hidden px-6 pb-10 pt-8">
+      <section id="hero" className="relative overflow-hidden px-5 pb-10 pt-8 sm:px-6">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-[36rem] bg-[radial-gradient(circle_at_15%_20%,rgba(217,119,6,0.18),transparent_32%),radial-gradient(circle_at_85%_10%,rgba(23,32,51,0.16),transparent_28%),radial-gradient(circle_at_50%_55%,rgba(255,255,255,0.75),transparent_44%)]" />
         <div className="relative mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="py-10">
-            <div className="inline-flex rounded-full border border-stone-300/80 bg-white/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-stone-600 shadow-sm backdrop-blur">
+            <div className="motion-fade inline-flex rounded-full border border-stone-300/80 bg-white/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-stone-600 shadow-sm backdrop-blur">
               FlowForge Public Journal
             </div>
-            <h1 className="mt-7 max-w-4xl text-5xl font-semibold leading-[0.96] tracking-[-0.065em] md:text-7xl">
+            <h1 className="motion-fade motion-fade-delay-1 mt-7 max-w-4xl text-5xl font-semibold leading-[0.96] tracking-[-0.065em] md:text-7xl">
               Stories, editorial rhythm, and a publishing system that feels calm on the surface.
             </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-stone-700 md:text-xl">
+            <p className="motion-fade motion-fade-delay-2 mt-6 max-w-2xl text-lg leading-8 text-stone-700 md:text-xl">
               Landing page publik ini dibuat untuk pembaca dan tim editorial sekaligus:
               guest bisa menikmati artikel yang sudah terbit, sementara user login tetap
               bisa berpindah ke dashboard untuk menulis, meninjau, dan menerbitkan konten.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="motion-fade motion-fade-delay-2 mt-8 flex flex-wrap gap-3">
               <a
                 href="#blog"
                 className="rounded-full bg-stone-950 px-6 py-3 text-sm font-bold text-white"
@@ -125,7 +127,7 @@ export default function HomePage() {
               </a>
             </div>
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-[1.75rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur">
+              <div className="surface-panel hover-lift motion-fade motion-fade-delay-1 rounded-[1.75rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                   Public reading
                 </p>
@@ -133,7 +135,7 @@ export default function HomePage() {
                   Pembaca bisa membuka feed dan detail artikel tanpa harus login lebih dulu.
                 </p>
               </div>
-              <div className="rounded-[1.75rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur">
+              <div className="surface-panel hover-lift motion-fade motion-fade-delay-2 rounded-[1.75rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                   Editorial flow
                 </p>
@@ -141,7 +143,7 @@ export default function HomePage() {
                   Writer, editor, dan admin bekerja dari dashboard tanpa memutus pengalaman membaca publik.
                 </p>
               </div>
-              <div className="rounded-[1.75rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur">
+              <div className="surface-panel hover-lift motion-fade motion-fade-delay-3 rounded-[1.75rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                   One platform
                 </p>
@@ -153,10 +155,10 @@ export default function HomePage() {
           </div>
 
           <div className="relative">
-            <div className="absolute -left-6 top-10 hidden h-32 w-32 rounded-full bg-amber-300/35 blur-2xl lg:block" />
-            <div className="absolute -right-6 bottom-10 hidden h-40 w-40 rounded-full bg-stone-900/10 blur-3xl lg:block" />
+            <div className="motion-float absolute -left-6 top-10 hidden h-32 w-32 rounded-full bg-amber-300/35 blur-2xl lg:block" />
+            <div className="motion-float absolute -right-6 bottom-10 hidden h-40 w-40 rounded-full bg-stone-900/10 blur-3xl lg:block" />
             {user ? (
-              <section className="relative rounded-[2.2rem] border border-white/70 bg-white/92 p-7 shadow-2xl shadow-stone-900/10 backdrop-blur">
+              <section className="surface-panel motion-fade motion-fade-delay-2 relative rounded-[2.2rem] border border-white/70 bg-white/92 p-6 shadow-2xl shadow-stone-900/10 backdrop-blur sm:p-7">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                   Logged in
                 </p>
@@ -194,7 +196,7 @@ export default function HomePage() {
                 <p className="mt-4 text-sm text-slate-500">{message}</p>
               </section>
             ) : (
-              <div id="auth" className="relative">
+              <div id="auth" className="motion-fade motion-fade-delay-2 relative">
                 <AuthScreen
                   mode={authMode}
                   name={name}
@@ -217,9 +219,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="intro" className="px-6 py-16">
+      <section id="intro" className="px-5 py-16 sm:px-6">
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-[2.25rem] bg-stone-950 p-8 text-white shadow-xl shadow-stone-900/10">
+          <div className="surface-panel motion-fade rounded-[2.25rem] bg-stone-950 p-8 text-white shadow-xl shadow-stone-900/10">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
               Section 1
             </p>
@@ -234,7 +236,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
-            <div className="rounded-[2rem] border border-stone-200 bg-white/85 p-6 shadow-sm">
+            <div className="surface-panel hover-lift motion-fade motion-fade-delay-1 rounded-[2rem] border border-stone-200 bg-white/85 p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                 Readers first
               </p>
@@ -246,7 +248,7 @@ export default function HomePage() {
                 detail artikel yang bisa dibuka langsung lewat slug.
               </p>
             </div>
-            <div className="rounded-[2rem] border border-stone-200 bg-white/85 p-6 shadow-sm">
+            <div className="surface-panel hover-lift motion-fade motion-fade-delay-2 rounded-[2rem] border border-stone-200 bg-white/85 p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                 Editors in control
               </p>
@@ -258,7 +260,7 @@ export default function HomePage() {
                 tanpa membuat halaman publik terasa seperti panel admin.
               </p>
             </div>
-            <div className="rounded-[2rem] border border-stone-200 bg-white/85 p-6 shadow-sm md:col-span-2">
+            <div className="surface-panel motion-fade motion-fade-delay-3 rounded-[2rem] border border-stone-200 bg-white/85 p-6 shadow-sm md:col-span-2">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
@@ -285,9 +287,9 @@ export default function HomePage() {
         />
       </section>
 
-      <section id="contact" className="px-6 py-16">
+      <section id="contact" className="px-5 py-16 sm:px-6">
         <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[2.25rem] border border-stone-200 bg-white/90 p-8 shadow-sm">
+          <div className="surface-panel motion-fade rounded-[2.25rem] border border-stone-200 bg-white/90 p-6 shadow-sm sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
               Section 3
             </p>
@@ -299,7 +301,7 @@ export default function HomePage() {
               ke workspace internal? Hubungi tim kami melalui kanal berikut.
             </p>
             <div className="mt-8 grid gap-4 md:grid-cols-2">
-              <div className="rounded-[1.75rem] bg-stone-100 p-5">
+              <div className="hover-lift rounded-[1.75rem] bg-stone-100 p-5">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                   Editorial desk
                 </p>
@@ -308,7 +310,7 @@ export default function HomePage() {
                   Untuk issue publikasi, review tulisan, dan kurasi artikel yang akan tayang.
                 </p>
               </div>
-              <div className="rounded-[1.75rem] bg-stone-100 p-5">
+              <div className="hover-lift rounded-[1.75rem] bg-stone-100 p-5">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-stone-500">
                   Admin support
                 </p>
@@ -319,7 +321,7 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <div className="rounded-[2.25rem] bg-stone-950 p-8 text-white shadow-xl shadow-stone-900/10">
+          <div className="surface-panel motion-fade motion-fade-delay-2 rounded-[2.25rem] bg-stone-950 p-6 text-white shadow-xl shadow-stone-900/10 sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
               Say hello
             </p>
@@ -349,7 +351,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-stone-200 bg-white/80 px-6 py-8 backdrop-blur">
+      <footer className="border-t border-stone-200 bg-white/80 px-5 py-8 backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-bold text-stone-950">FlowForge Stories</p>

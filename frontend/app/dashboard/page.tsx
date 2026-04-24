@@ -9,12 +9,13 @@ import { RunDetailPanel } from "../components/RunDetailPanel";
 import { RunList } from "../components/RunList";
 import { WorkflowForm } from "../components/WorkflowForm";
 import { WorkflowList } from "../components/WorkflowList";
-import { EmptyState, InfoTile, Panel, StatusBadge } from "../components/ui";
+import { EmptyState, InfoTile, Panel, ScorePill, StatusBadge } from "../components/ui";
 import { API_BASE_URL, baseNavItems, sampleDefinition } from "../lib/constants";
 import { clearSession, readSession } from "../lib/session";
 import type {
   ApiUser,
   BlogPost,
+  ContentReview,
   ExecutionSseEvent,
   FailureAnalysis,
   HealthOverview,
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [postForm, setPostForm] = useState(emptyPostForm);
+  const [draftReview, setDraftReview] = useState<ContentReview | null>(null);
   const [activeView, setActiveView] = useState<ViewKey>("home");
 
   const [toolView, setToolView] = useState<ToolView>("overview");
@@ -71,6 +73,7 @@ export default function DashboardPage() {
 
   const pendingPosts = posts.filter((post) => post.status === "PENDING_REVIEW");
   const publishedCount = posts.filter((post) => post.status === "PUBLISHED").length;
+  const selectedPost = posts.find((post) => post.id === selectedPostId) ?? null;
   const selectedDefinition =
     selectedRun?.workflowVersion?.definitionJson ??
     selectedWorkflow?.versions?.[0]?.definitionJson;
@@ -158,11 +161,13 @@ export default function DashboardPage() {
       excerpt: post.excerpt ?? "",
       content: post.content,
     });
+    setDraftReview(post.contentReview ?? null);
   }
 
   function resetPostEditor() {
     setSelectedPostId(null);
     setPostForm(emptyPostForm);
+    setDraftReview(null);
   }
 
   useEffect(() => {
@@ -289,6 +294,34 @@ export default function DashboardPage() {
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save post");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function runDraftChecks() {
+    if (!postForm.title || !postForm.content) {
+      setMessage("Isi title dan content dulu sebelum menjalankan AI checks");
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage("Running SEO, plagiarism, and sensitive-content checks...");
+
+    try {
+      const review = await apiFetch<ContentReview>("/ai/posts/content-review", {
+        method: "POST",
+        body: JSON.stringify({
+          title: postForm.title,
+          excerpt: postForm.excerpt,
+          content: postForm.content,
+        }),
+      });
+
+      setDraftReview(review);
+      setMessage("AI checks completed");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to run AI checks");
     } finally {
       setIsLoading(false);
     }
@@ -506,9 +539,10 @@ export default function DashboardPage() {
 
   function renderPosts() {
     const canDirectPublish = user?.role === "ADMIN" || user?.role === "EDITOR";
+    const reviewToDisplay = draftReview ?? selectedPost?.contentReview ?? null;
 
     return (
-      <div className="grid gap-5 xl:grid-cols-[0.94fr_1.06fr]">
+      <div className="grid gap-5 xl:grid-cols-[0.88fr_0.74fr_0.88fr]">
         <Panel
           title={selectedPostId ? "Edit Post" : "Write a New Post"}
           eyebrow={selectedPostId ? "Existing post" : "Draft first"}
@@ -539,6 +573,13 @@ export default function DashboardPage() {
               />
             </label>
             <div className="flex flex-wrap gap-3">
+              <button
+                className="rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3 text-sm font-bold text-sky-900 disabled:opacity-50"
+                disabled={isLoading || !postForm.title || !postForm.content}
+                onClick={() => void runDraftChecks()}
+              >
+                Run AI checks
+              </button>
               <button
                 className="rounded-2xl bg-stone-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
                 disabled={isLoading || !postForm.title || !postForm.content}
@@ -613,6 +654,89 @@ export default function DashboardPage() {
             ))}
             {posts.length === 0 && <EmptyState text="Belum ada tulisan. Mulai dari draft pertama." />}
           </div>
+        </Panel>
+        <Panel
+          title="Post Intelligence"
+          eyebrow={selectedPost ? selectedPost.status : draftReview ? "Draft review" : "AI review"}
+        >
+          {reviewToDisplay ? (
+            <div className="space-y-5">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Summary
+                </p>
+                <p className="mt-3 text-sm leading-7 text-slate-700">{reviewToDisplay.summary}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <StatusBadge status={reviewToDisplay.recommendation.toUpperCase()} />
+                  <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-slate-700">
+                    {reviewToDisplay.source}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ScorePill label="SEO score" value={`${reviewToDisplay.seo.score}/100`} />
+                <ScorePill
+                  label="Plagiarism risk"
+                  value={`${reviewToDisplay.plagiarism.risk} (${reviewToDisplay.plagiarism.score})`}
+                />
+                <ScorePill
+                  label="Sensitive risk"
+                  value={`${reviewToDisplay.sensitiveContent.risk} (${reviewToDisplay.sensitiveContent.score})`}
+                />
+                <ScorePill
+                  label="Keyword density"
+                  value={reviewToDisplay.seo.keywordDensity}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                    SEO criteria
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                    <li>Title length: {reviewToDisplay.seo.titleLengthOk ? "OK" : "Needs work"}</li>
+                    <li>Excerpt length: {reviewToDisplay.seo.excerptLengthOk ? "OK" : "Needs work"}</li>
+                    {reviewToDisplay.seo.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                    Plagiarism criteria
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                    <li>
+                      Repeated sentences: {reviewToDisplay.plagiarism.repeatedSentenceCount}
+                    </li>
+                    {reviewToDisplay.plagiarism.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                    Sensitive content criteria
+                  </p>
+                  <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+                    <li>
+                      Categories:{" "}
+                      {reviewToDisplay.sensitiveContent.categories.length > 0
+                        ? reviewToDisplay.sensitiveContent.categories.join(", ")
+                        : "No notable categories"}
+                    </li>
+                    {reviewToDisplay.sensitiveContent.notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState text="Belum ada hasil AI review. Jalankan AI checks atau pilih post yang sudah pernah diperiksa." />
+          )}
         </Panel>
       </div>
     );

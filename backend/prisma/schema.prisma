@@ -120,6 +120,8 @@ model Post {
   excerpt       String?
   content       String
   status        PostStatus @default(DRAFT)
+  contentReview Json?
+  reviewCheckedAt DateTime?
   publishedAt   DateTime?
   reviewedAt    DateTime?
   createdAt     DateTime   @default(now())

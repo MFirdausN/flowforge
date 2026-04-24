@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { API_BASE_URL } from "../lib/constants";
 import type { ApiUser, ViewKey } from "../lib/types";
 
@@ -37,6 +38,13 @@ export function AdminShell({
         </div>
 
         <nav className="space-y-1">
+          <Link
+            href="/"
+            className="block w-full rounded-xl px-3 py-3 text-left text-stone-300 transition hover:bg-stone-900 hover:text-white"
+          >
+            <span className="block text-sm font-bold">Landing Page</span>
+            <span className="text-xs opacity-65">Back to public home</span>
+          </Link>
           {navItems.map((item) => (
             <button
               key={item.key}
@@ -53,7 +61,7 @@ export function AdminShell({
           ))}
         </nav>
 
-        <div className="absolute bottom-5 left-5 right-5 rounded-3xl border border-stone-800 bg-stone-900 p-4">
+        <div className="surface-panel absolute bottom-5 left-5 right-5 rounded-3xl border border-stone-800 bg-stone-900 p-4">
           <p className="font-bold">{user.name}</p>
           <p className="text-sm text-slate-400">
             {user.role} / {user.tenant.slug}
@@ -68,7 +76,7 @@ export function AdminShell({
       </aside>
 
       <section className="lg:pl-72">
-        <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 px-5 py-4 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 px-4 py-4 backdrop-blur sm:px-5">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-stone-500">
@@ -79,6 +87,12 @@ export function AdminShell({
               </h2>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link
+                className="rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-bold text-stone-700 transition hover:border-stone-300"
+                href="/"
+              >
+                Back to landing
+              </Link>
               <button
                 className="rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-bold text-stone-700 transition hover:border-stone-300"
                 onClick={onRefresh}
@@ -95,7 +109,13 @@ export function AdminShell({
               </a>
             </div>
           </div>
-          <div className="mt-4 flex gap-2 overflow-x-auto lg:hidden">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+            <Link
+              href="/"
+              className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-bold text-stone-600"
+            >
+              Landing
+            </Link>
             {navItems.map((item) => (
               <button
                 key={item.key}
@@ -112,7 +132,7 @@ export function AdminShell({
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl space-y-5 px-5 py-6">
+        <div className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-5">
           {message && (
             <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-600 shadow-sm">
               {message}

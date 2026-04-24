@@ -14,7 +14,7 @@ export function PublishedFeed({
   return (
     <section className="bg-stone-950 px-6 py-16 text-white">
       <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="motion-fade flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-300">
               Public feed
@@ -27,7 +27,7 @@ export function PublishedFeed({
           {posts.map((post) => (
             <article
               key={post.id}
-              className="rounded-[2rem] border border-stone-800 bg-white/5 p-6 backdrop-blur"
+              className="surface-panel hover-lift motion-fade rounded-[2rem] border border-stone-800 bg-white/5 p-6 backdrop-blur"
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="rounded-full bg-amber-300 px-3 py-1 text-xs font-bold text-stone-950">
@@ -41,10 +41,15 @@ export function PublishedFeed({
               <p className="mt-3 text-sm leading-7 text-stone-300">
                 {post.excerpt || `${post.content.slice(0, 180)}...`}
               </p>
-              <div className="mt-6 flex items-center justify-between gap-4 rounded-3xl bg-white/6 p-4 text-sm text-stone-200">
+              <div className="mt-6 flex flex-col gap-4 rounded-3xl bg-white/6 p-4 text-sm text-stone-200 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-bold">{post.author.name}</p>
                   <p className="mt-1 text-stone-400">/{post.slug}</p>
+                  {post.tenant && (
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-500">
+                      {post.tenant.name}
+                    </p>
+                  )}
                 </div>
                 <Link
                   href={`/posts/${post.slug}`}

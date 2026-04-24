@@ -28,7 +28,7 @@ export function PublicNavbar({
             <p className="text-xs text-stone-500">Public landing and editorial blog</p>
           </div>
         </Link>
-        <nav className="flex flex-wrap items-center gap-2">
+        <nav className="flex flex-wrap items-center gap-2 sm:justify-end">
           <a
             href="#hero"
             className="rounded-full px-4 py-2 text-sm font-bold text-stone-700 transition hover:bg-stone-100"

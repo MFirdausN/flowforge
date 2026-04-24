@@ -3,35 +3,46 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PostStatus, Prisma, UserRole } from '@prisma/client';
+import { PostStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { AiAnalysisService } from '../ai/ai-analysis.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiAnalysisService: AiAnalysisService,
+  ) {}
 
-  async listPublished(tenantId: string) {
+  async listPublished() {
     return this.prisma.post.findMany({
-      where: { tenantId, status: PostStatus.PUBLISHED },
+      where: { status: PostStatus.PUBLISHED },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       include: {
         author: {
           select: { id: true, name: true, role: true },
         },
+        tenant: {
+          select: { id: true, name: true, slug: true },
+        },
       },
     });
   }
 
-  async findPublishedBySlug(tenantId: string, slug: string) {
+  async findPublishedBySlug(slug: string) {
     const post = await this.prisma.post.findFirst({
-      where: { tenantId, slug, status: PostStatus.PUBLISHED },
+      where: { slug, status: PostStatus.PUBLISHED },
       include: {
         author: {
           select: { id: true, name: true, role: true },
         },
+        tenant: {
+          select: { id: true, name: true, slug: true },
+        },
       },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
     });
 
     if (!post) {
@@ -68,6 +79,11 @@ export class PostsService {
       user.tenantId,
       dto.slug || this.slugify(dto.title),
     );
+    const contentReview = await this.aiAnalysisService.reviewPostContent({
+      title: dto.title,
+      excerpt: dto.excerpt,
+      content: dto.content,
+    });
 
     return this.prisma.post.create({
       data: {
@@ -78,6 +94,8 @@ export class PostsService {
         excerpt: dto.excerpt,
         content: dto.content,
         status,
+        contentReview,
+        reviewCheckedAt: new Date(contentReview.checkedAt),
         ...(status === PostStatus.PUBLISHED
           ? {
               reviewerId: user.sub,
@@ -101,6 +119,14 @@ export class PostsService {
 
     const nextSlug =
       dto.slug || (dto.title && dto.title !== post.title ? this.slugify(dto.title) : post.slug);
+    const nextTitle = dto.title ?? post.title;
+    const nextExcerpt = dto.excerpt ?? post.excerpt ?? undefined;
+    const nextContent = dto.content ?? post.content;
+    const contentReview = await this.aiAnalysisService.reviewPostContent({
+      title: nextTitle,
+      excerpt: nextExcerpt,
+      content: nextContent,
+    });
 
     return this.prisma.post.update({
       where: { id: post.id },
@@ -112,6 +138,8 @@ export class PostsService {
           ? {}
           : { slug: await this.ensureUniqueSlug(user.tenantId, nextSlug, post.id) }),
         status,
+        contentReview,
+        reviewCheckedAt: new Date(contentReview.checkedAt),
         reviewerId: status === PostStatus.PUBLISHED ? user.sub : status === PostStatus.PENDING_REVIEW ? null : post.reviewerId,
         reviewedAt:
           status === PostStatus.PUBLISHED ? new Date() : status === PostStatus.PENDING_REVIEW ? null : post.reviewedAt,
