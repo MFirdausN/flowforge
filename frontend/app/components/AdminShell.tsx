@@ -48,6 +48,7 @@ export function AdminShell({
           {navItems.map((item) => (
             <button
               key={item.key}
+              type="button"
               className={`w-full rounded-xl px-3 py-3 text-left transition ${
                 activeView === item.key
                   ? "bg-amber-300 text-stone-950"
@@ -67,6 +68,7 @@ export function AdminShell({
             {user.role} / {user.tenant.slug}
           </p>
           <button
+            type="button"
             className="mt-4 rounded-2xl bg-amber-300 px-3 py-2 text-sm font-bold text-stone-950"
             onClick={onLogout}
           >
@@ -94,6 +96,7 @@ export function AdminShell({
                 Back to landing
               </Link>
               <button
+                type="button"
                 className="rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-bold text-stone-700 transition hover:border-stone-300"
                 onClick={onRefresh}
               >
@@ -119,6 +122,7 @@ export function AdminShell({
             {navItems.map((item) => (
               <button
                 key={item.key}
+                type="button"
                 className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${
                   activeView === item.key
                     ? "bg-stone-950 text-white"

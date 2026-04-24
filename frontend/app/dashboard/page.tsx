@@ -38,6 +38,21 @@ const emptyPostForm = {
   content: "",
 };
 
+function isExecutionEvent(payload: unknown): payload is ExecutionSseEvent {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  const candidate = payload as Partial<ExecutionSseEvent>;
+  return (
+    typeof candidate.runId === "string" &&
+    typeof candidate.type === "string" &&
+    typeof candidate.emittedAt === "string" &&
+    !!candidate.data &&
+    typeof candidate.data === "object"
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
@@ -234,11 +249,16 @@ export default function DashboardPage() {
               continue;
             }
 
-            const payload = JSON.parse(dataLine.slice(5).trim()) as ExecutionSseEvent;
+            const rawPayload = JSON.parse(dataLine.slice(5).trim()) as unknown;
+            if (!isExecutionEvent(rawPayload)) {
+              continue;
+            }
+
+            const payload = rawPayload;
             setLiveEvents((current) => [payload, ...current].slice(0, 12));
             setRuns((current) =>
               current.map((run) =>
-                run.id === payload.runId && payload.data.status
+                run.id === payload.runId && typeof payload.data.status === "string"
                   ? { ...run, status: payload.data.status }
                   : run,
               ),
@@ -444,10 +464,27 @@ export default function DashboardPage() {
   async function selectRun(runId: string) {
     try {
       const detail = await apiFetch<RunDetail>(`/runs/${runId}`);
-      setSelectedRun(detail);
+      setSelectedRun({
+        ...detail,
+        status: detail.status ?? "UNKNOWN",
+        triggerType: detail.triggerType ?? "UNKNOWN",
+        steps: Array.isArray(detail.steps)
+          ? detail.steps.filter(Boolean).map((step) => ({
+              ...step,
+              status: step?.status ?? "UNKNOWN",
+              stepId: step?.stepId ?? "unknown-step",
+              stepType: step?.stepType ?? "unknown",
+            }))
+          : [],
+        logs: Array.isArray(detail.logs) ? detail.logs.filter(Boolean) : [],
+      });
       setFailureAnalysis(null);
       setLiveEvents([]);
+      setMessage(`Run ${runId.slice(0, 8)} loaded`);
     } catch (error) {
+      setSelectedRun(null);
+      setFailureAnalysis(null);
+      setLiveEvents([]);
       setMessage(error instanceof Error ? error.message : "Unable to load run detail");
     }
   }
@@ -506,6 +543,7 @@ export default function DashboardPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 {posts.slice(0, 4).map((post) => (
                   <button
+                    type="button"
                     key={post.id}
                     className="rounded-3xl border border-stone-200 bg-stone-50 p-4 text-left transition hover:border-stone-400"
                     onClick={() => {
@@ -574,6 +612,7 @@ export default function DashboardPage() {
             </label>
             <div className="flex flex-wrap gap-3">
               <button
+                type="button"
                 className="rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3 text-sm font-bold text-sky-900 disabled:opacity-50"
                 disabled={isLoading || !postForm.title || !postForm.content}
                 onClick={() => void runDraftChecks()}
@@ -581,6 +620,7 @@ export default function DashboardPage() {
                 Run AI checks
               </button>
               <button
+                type="button"
                 className="rounded-2xl bg-stone-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
                 disabled={isLoading || !postForm.title || !postForm.content}
                 onClick={() => void savePost("draft")}
@@ -588,6 +628,7 @@ export default function DashboardPage() {
                 Save draft
               </button>
               <button
+                type="button"
                 className="rounded-2xl border border-amber-300 bg-amber-100 px-5 py-3 text-sm font-bold text-amber-950 disabled:opacity-50"
                 disabled={isLoading || !postForm.title || !postForm.content}
                 onClick={() => void savePost(canDirectPublish ? "publish" : "submit")}
@@ -626,6 +667,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
+                    type="button"
                     className="rounded-2xl bg-stone-950 px-3 py-2 text-xs font-bold text-white"
                     onClick={() => hydratePostEditor(post)}
                   >
@@ -634,6 +676,7 @@ export default function DashboardPage() {
                   {(user?.role === "ADMIN" || user?.role === "EDITOR") &&
                     post.status !== "PUBLISHED" && (
                       <button
+                        type="button"
                         className="rounded-2xl bg-amber-300 px-3 py-2 text-xs font-bold text-stone-950"
                         onClick={() => void publishPost(post.id)}
                       >
@@ -643,6 +686,7 @@ export default function DashboardPage() {
                   {post.status === "PUBLISHED" &&
                     (user?.role === "ADMIN" || user?.role === "EDITOR") && (
                       <button
+                        type="button"
                         className="rounded-2xl border border-stone-200 bg-white px-3 py-2 text-xs font-bold text-stone-700"
                         onClick={() => void unpublishPost(post.id)}
                       >
@@ -762,12 +806,14 @@ export default function DashboardPage() {
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
+                  type="button"
                   className="rounded-2xl bg-stone-950 px-4 py-2 text-sm font-bold text-white"
                   onClick={() => void publishPost(post.id)}
                 >
                   Publish
                 </button>
                 <button
+                  type="button"
                   className="rounded-2xl border border-stone-200 bg-white px-4 py-2 text-sm font-bold text-stone-700"
                   onClick={() => {
                     hydratePostEditor(post);
@@ -837,6 +883,7 @@ export default function DashboardPage() {
           {toolTabs.map((tab) => (
             <button
               key={tab.key}
+              type="button"
               className={`rounded-full px-4 py-2 text-sm font-bold ${
                 toolView === tab.key ? "bg-stone-950 text-white" : "bg-white text-stone-600"
               }`}

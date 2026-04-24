@@ -19,6 +19,21 @@ export function RunDetailPanel({
   liveEvents: ExecutionSseEvent[];
   onAnalyze: (runId: string) => Promise<void>;
 }) {
+  const safeSteps = Array.isArray(selectedRun?.steps)
+    ? selectedRun.steps.filter(
+        (
+          step,
+        ): step is NonNullable<RunDetail["steps"]>[number] & {
+          stepId: string;
+          stepType: string;
+          status: string;
+        } => Boolean(step?.id),
+      )
+    : [];
+  const safeEvents = Array.isArray(liveEvents)
+    ? liveEvents.filter((event): event is ExecutionSseEvent => Boolean(event?.emittedAt))
+    : [];
+
   return (
     <Panel title="Run Detail" eyebrow={selectedRun?.id ?? "Pick a run"}>
       {selectedRun ? (
@@ -35,14 +50,15 @@ export function RunDetailPanel({
             <StatusBadge status={liveStatus.toUpperCase()} />
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <InfoTile label="Status" value={selectedRun.status} />
-            <InfoTile label="Trigger" value={selectedRun.triggerType} />
+            <InfoTile label="Status" value={selectedRun.status ?? "UNKNOWN"} />
+            <InfoTile label="Trigger" value={selectedRun.triggerType ?? "UNKNOWN"} />
             <InfoTile
               label="Duration"
               value={`${selectedRun.durationMs ?? 0}ms`}
             />
           </div>
           <button
+            type="button"
             className="rounded-xl bg-slate-950 px-5 py-3 font-bold text-white transition hover:bg-slate-800"
             onClick={() => void onAnalyze(selectedRun.id)}
           >
@@ -68,17 +84,17 @@ export function RunDetailPanel({
             </div>
           )}
           <div className="space-y-3">
-            {selectedRun.steps.map((step) => (
+            {safeSteps.map((step) => (
               <div
                 key={step.id}
                 className="rounded-xl border border-slate-200 bg-slate-50 p-4"
               >
                 <div className="flex items-center justify-between">
-                  <strong>{step.stepId}</strong>
-                  <StatusBadge status={step.status} />
+                  <strong>{step.stepId ?? "Unknown step"}</strong>
+                  <StatusBadge status={step.status ?? "UNKNOWN"} />
                 </div>
                 <p className="mt-2 text-sm text-slate-500">
-                  {step.stepType} / attempt {step.attemptNo} /{" "}
+                  {step.stepType ?? "unknown"} / attempt {step.attemptNo ?? 0} /{" "}
                   {step.durationMs ?? 0}ms
                 </p>
                 {step.errorMessage && (
@@ -89,11 +105,11 @@ export function RunDetailPanel({
               </div>
             ))}
           </div>
-          {liveEvents.length > 0 && (
+          {safeEvents.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="font-semibold">Live event tail</h3>
               <div className="mt-3 space-y-2">
-                {liveEvents.map((event) => (
+                {safeEvents.map((event) => (
                   <div
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"
                     key={`${event.emittedAt}-${event.type}-${event.data.stepId ?? "run"}`}

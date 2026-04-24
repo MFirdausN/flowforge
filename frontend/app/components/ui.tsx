@@ -63,18 +63,19 @@ export function InfoTile({
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  const normalizedStatus = String(status ?? "UNKNOWN").toUpperCase();
   const color =
-    status === "SUCCEEDED" || status === "ACTIVE"
+    normalizedStatus === "SUCCEEDED" || normalizedStatus === "ACTIVE"
       ? "bg-teal-50 text-teal-700 ring-teal-100"
-      : status === "FAILED" || status === "TIMEOUT"
+      : normalizedStatus === "FAILED" || normalizedStatus === "TIMEOUT"
         ? "bg-red-50 text-red-700 ring-red-100"
-        : status === "RUNNING"
+        : normalizedStatus === "RUNNING"
           ? "bg-amber-50 text-amber-700 ring-amber-100"
           : "bg-slate-100 text-slate-600 ring-slate-200";
 
   return (
     <span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${color}`}>
-      {status}
+      {normalizedStatus}
     </span>
   );
 }

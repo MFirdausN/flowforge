@@ -11,17 +11,24 @@ export function RunList({
   selectedRun?: RunDetail | null;
   onSelect: (runId: string) => Promise<void>;
 }) {
+  const safeRuns = runs.filter((run): run is WorkflowRun => Boolean(run?.id));
+
   return (
     <div className="space-y-3">
-      {runs.map((run) => (
+      {safeRuns.map((run) => (
         <button
           key={run.id}
+          type="button"
           className={`w-full rounded-xl border p-4 text-left transition hover:border-slate-300 ${
             selectedRun?.id === run.id
               ? "border-slate-400 bg-slate-50"
               : "border-slate-200 bg-white"
           }`}
-          onClick={() => void onSelect(run.id)}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void onSelect(run.id);
+          }}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -32,14 +39,14 @@ export function RunList({
                 {run.triggerType}
               </p>
             </div>
-            <StatusBadge status={run.status} />
+            <StatusBadge status={run.status ?? "UNKNOWN"} />
           </div>
           <p className="mt-3 text-sm text-slate-500">
             {formatDate(run.startedAt)} / {run.durationMs ?? 0}ms
           </p>
         </button>
       ))}
-      {runs.length === 0 && <EmptyState text="Belum ada run history." />}
+      {safeRuns.length === 0 && <EmptyState text="Belum ada run history." />}
     </div>
   );
 }

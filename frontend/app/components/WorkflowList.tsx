@@ -54,6 +54,7 @@ export function WorkflowList({
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
+              type="button"
               className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
               disabled={user.role === "USER"}
               onClick={() => void onTrigger(workflow)}
@@ -61,6 +62,7 @@ export function WorkflowList({
               Trigger
             </button>
             <button
+              type="button"
               className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-40"
               disabled={user.role !== "ADMIN"}
               onClick={() => void onDelete(workflow)}
