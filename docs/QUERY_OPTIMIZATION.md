@@ -1,108 +1,112 @@
 # Query Optimization
 
-## Target Query
+## Current High-Read Query
 
-The run history endpoint powers the dashboard and is expected to be used frequently:
+The most important public read path is the landing page feed of published posts:
 
 ```sql
 SELECT *
-FROM workflow_runs
-WHERE tenantId = $1
-ORDER BY createdAt DESC
-LIMIT 20 OFFSET 0;
+FROM posts
+WHERE status = 'PUBLISHED'
+ORDER BY publishedAt DESC
+LIMIT 12;
 ```
 
-This maps to `GET /runs?page=1&limit=20` and is tenant-scoped.
+This powers:
 
-## Existing Index
+- `GET /posts/published`
+- the landing page blog section
+- logged-in users reading the same public feed
 
-The initial Prisma migration creates:
+## Why This Query Matters
+
+It is the first content query hit by:
+
+- guests opening the landing page
+- authenticated users returning to the public home
+- search-engine and share-preview traffic hitting published content
+
+Because it is public and repeated often, it should stay predictable and cheap.
+
+## Recommended Index Shape
+
+For the current product, the most useful index is:
 
 ```sql
-CREATE INDEX "workflow_runs_tenantId_createdAt_idx"
-ON "workflow_runs"("tenantId", "createdAt");
+CREATE INDEX CONCURRENTLY posts_status_publishedAt_idx
+ON posts ("status", "publishedAt" DESC);
 ```
 
-This supports tenant filtering and chronological ordering. PostgreSQL can scan the index backward for `ORDER BY createdAt DESC`.
+If the public blog later becomes tenant-scoped by URL, prefer:
 
-## Expected EXPLAIN Plan
-
-Run the local verification script after migrations and seed data:
-
-```bash
-psql "$DATABASE_URL" -f docs/sql/explain-run-history.sql
+```sql
+CREATE INDEX CONCURRENTLY posts_tenant_status_publishedAt_idx
+ON posts ("tenantId", "status", "publishedAt" DESC);
 ```
 
-Representative plan for a tenant with many runs:
+## Expected Plan
+
+With a matching index, PostgreSQL should be able to avoid a full sort and scan the newest published rows directly:
 
 ```text
-Limit  (cost=0.42..12.80 rows=20 width=...)
-  ->  Index Scan Backward using workflow_runs_tenantId_createdAt_idx on workflow_runs
-        (cost=0.42..18492.31 rows=29875 width=...)
-        Index Cond: ("tenantId" = 'tenant-1'::text)
+Limit
+  -> Index Scan using posts_status_publishedAt_idx on posts
+       Index Cond: (status = 'PUBLISHED')
 ```
 
-Why this is good:
+This keeps the landing page fast even as draft and review-stage content grows.
 
-- The database avoids scanning runs from other tenants.
-- The database avoids an explicit sort because the index is ordered by `tenantId, createdAt`.
-- The query can stop after the first page because of `LIMIT 20`.
+## Slug Lookup Query
 
-## Additional Filter Optimization
-
-The API also supports `status` and `workflowId` filtering. For high traffic, these indexes would be useful:
+Public post detail uses a slug lookup:
 
 ```sql
-CREATE INDEX CONCURRENTLY workflow_runs_tenant_status_created_idx
-ON workflow_runs ("tenantId", "status", "createdAt" DESC);
-
-CREATE INDEX CONCURRENTLY workflow_runs_tenant_workflow_created_idx
-ON workflow_runs ("tenantId", "workflowId", "createdAt" DESC);
+SELECT *
+FROM posts
+WHERE slug = $1
+  AND status = 'PUBLISHED'
+LIMIT 1;
 ```
 
-These are not mandatory for the MVP, but they become valuable when tenants have many runs and dashboard filters are heavily used.
-
-## Logs Strategy
-
-Execution logs are currently stored in PostgreSQL:
+Recommended index:
 
 ```sql
-CREATE INDEX "execution_logs_workflowRunId_createdAt_idx"
-ON "execution_logs"("workflowRunId", "createdAt");
+CREATE UNIQUE INDEX CONCURRENTLY posts_slug_key
+ON posts ("slug");
 ```
 
-This is acceptable for MVP because:
-
-- Logs are displayed per run or per step.
-- Relational joins keep run detail implementation simple.
-- Transactions keep run/step/log state consistent.
-
-For high-volume production:
-
-- Partition `execution_logs` by month or tenant.
-- Add retention policies for old INFO logs.
-- Stream logs to an append-only store such as Kafka, S3, ClickHouse, or OpenSearch.
-- Keep PostgreSQL as the source of truth for run/step status, not raw high-volume logs.
-
-## Migration Strategy
-
-Current migrations are managed by Prisma and applied with:
-
-```bash
-npx prisma migrate deploy
-```
-
-Safe migration rules:
-
-- Add nullable columns first, backfill separately, then make required later.
-- Create large indexes with `CONCURRENTLY` in hand-written SQL migrations.
-- Avoid destructive column drops in the same deploy that removes application usage.
-- Keep rollback strategy as forward fixes, not manual database rewinds.
-
-Example safe migration for a future webhook secret:
+If slug uniqueness ever becomes tenant-local instead of global, switch to:
 
 ```sql
-ALTER TABLE workflows ADD COLUMN "webhookSecretHash" TEXT;
+CREATE UNIQUE INDEX CONCURRENTLY posts_tenant_slug_key
+ON posts ("tenantId", "slug");
 ```
 
-Then deploy application code that writes the new column, backfill existing workflows, and only then enforce stricter validation.
+## JSON Review Payload Trade-Off
+
+`contentReview` is stored as JSON on the post record. That is useful because:
+
+- the dashboard can render the last review quickly
+- the app avoids rerunning AI checks for every page load
+- schema evolution is easier while the review payload is still changing
+
+Trade-off:
+
+- JSON is great for readback, but weaker for analytics
+- if you later need reporting such as average SEO score or high-risk moderation queues, consider extracting summary columns or a separate `post_reviews` table
+
+## Migration Guidance
+
+Current Prisma migrations should stay safe and additive:
+
+- add nullable columns first
+- backfill separately if needed
+- add indexes in focused migrations
+- prefer forward fixes over destructive rollback
+
+Recent example in this repo:
+
+- `contentReview JSONB`
+- `reviewCheckedAt TIMESTAMP`
+
+Those were added safely without breaking existing posts.

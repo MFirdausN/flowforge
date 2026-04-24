@@ -1,37 +1,49 @@
 # FlowForge
 
-FlowForge is a real-time oriented, multi-tenant workflow orchestration MVP built for the Sevima Software Engineer technical test. It lets tenants define workflow DAGs, version definitions, trigger executions, monitor run history, and inspect step-level logs.
+FlowForge is a multi-tenant editorial platform with a public-facing blog, role-based dashboard, and AI-assisted post review. The current app supports guest reading, authenticated editorial workflows, Docker-first local setup, and content checks for SEO, plagiarism risk, and sensitive content before publishing.
 
 ## Stack
 
 - Backend: NestJS, Prisma, PostgreSQL, JWT auth, role-based access control
-- Frontend: Next.js, React, Tailwind CSS, SVG DAG visualization
-- Infrastructure: Docker Compose, Postgres, Redis, GitHub Actions CI
-- Tests: Jest unit tests, API e2e tests with Supertest
+- Frontend: Next.js 16, React, Tailwind CSS
+- Infrastructure: Docker Compose, PostgreSQL, Redis
+- AI: OpenAI-backed review with local heuristic fallback
 
-## Features
+## Current Product Scope
 
-- JWT login with tenant-aware payloads
-- Roles: `ADMIN`, `EDITOR`, `VIEWER`
-- Workflow CRUD with version history and rollback
-- DAG validation, cycle detection, and topological sorting
-- Execution engine with dependency-aware parallel layers
-- Retry with exponential backoff and global workflow timeout
-- Step types: `http`, `delay`, `condition`, `script`
-- Manual trigger, webhook trigger, and cron-based scheduled trigger
-- Optional webhook HMAC validation with `WEBHOOK_SECRET`
-- Run tracking, step tracking, and execution logs
-- Server-Sent Events stream for realtime run and step status updates
-- In-memory rate limiting for high-read dashboard endpoints
-- Runs API with pagination and filtering
-- Health overview for active runs, success/failure rates, and average duration
-- AI failure analysis with heuristic fallback and optional LLM provider
-- Admin-only local API documentation at `/docs`
-- Frontend login, dashboard, workflow list, run history, run detail, and DAG visual
+- Public landing page with header, hero, intro, blog feed, contact section, and footer
+- Public post detail page at `/posts/[slug]`
+- Guest and logged-in users can both read published posts from the landing page
+- Role-based dashboard for `USER`, `EDITOR`, and `ADMIN`
+- Editorial post workflow with draft, review, and publish states
+- Admin-managed user and role controls
+- Protected API docs at `/docs` for admins
+- AI content review for SEO quality, plagiarism risk, and sensitive content risk
+- AI review data saved on posts and shown inside the dashboard post editor/detail area
+
+## Main Routes
+
+Frontend:
+
+- `/` public landing page
+- `/posts/[slug]` public post detail
+- `/dashboard` authenticated editorial workspace
+
+Key backend endpoints:
+
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /posts/published`
+- `GET /posts/published/:slug`
+- `POST /posts`
+- `PATCH /posts/:id`
+- `POST /ai/posts/content-review`
+- `GET /docs`
+- `GET /docs/openapi.json`
 
 ## Quick Start With Docker
 
-```bash
+```powershell
 Copy-Item .env.example .env
 docker compose up --build -d
 ```
@@ -43,44 +55,53 @@ Services:
 - Postgres: `127.0.0.1:15432`
 - Redis: `127.0.0.1:16379`
 
-All published ports are bound to `127.0.0.1` by default so they are reachable only from the same machine, not from other devices on the local network.
+All exposed ports are bound to `127.0.0.1` by default so they stay local to your machine.
 
-You can change the host ports safely in `.env`:
+To seed demo data after the stack is up:
 
-```bash
+```powershell
+docker compose exec backend npx prisma db seed
+```
+
+## Environment Variables
+
+Use `.env.example` as the template and keep your real secrets in `.env`.
+
+Important values:
+
+```env
+JWT_SECRET=change-this-local-secret
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+NEXT_PUBLIC_API_URL=http://localhost:13001
 FLOWFORGE_FRONTEND_PORT=13000
 FLOWFORGE_BACKEND_PORT=13001
 FLOWFORGE_POSTGRES_PORT=15432
 FLOWFORGE_REDIS_PORT=16379
 ```
 
-The backend container runs `prisma migrate deploy` before starting the API. To seed demo users after containers are up:
+Secret handling:
 
-```bash
-docker compose exec backend npx prisma db seed
-```
-
-Demo accounts:
-
-- `admin@tenant1.local / password123`
-- `editor@tenant1.local / password123`
-- `viewer@tenant1.local / password123`
+- `.env` should stay local and must not be committed
+- `.env.example` is safe to commit because it contains placeholders only
+- if a secret was ever committed before, it should be rotated immediately even if the file is later ignored
 
 ## Local Development
 
-Start infrastructure:
+For local development without Dockerized app containers, keep Postgres and Redis in Docker:
 
-```bash
-docker compose up postgres redis
+```powershell
+docker compose up -d postgres redis
 ```
 
 Backend:
 
-```bash
+```powershell
 cd backend
 npm install
-$env:DATABASE_URL="postgresql://postgres:postgres@localhost:5432/flowforge"
+$env:DATABASE_URL="postgresql://postgres:postgres@localhost:15432/flowforge"
 $env:JWT_SECRET="flowforge-local-secret"
+$env:OPENAI_API_KEY=""
 npx prisma migrate deploy
 npx prisma db seed
 npm run start:dev
@@ -88,130 +109,81 @@ npm run start:dev
 
 Frontend:
 
-```bash
+```powershell
 cd frontend
 npm install
-$env:NEXT_PUBLIC_API_URL="http://localhost:3001"
+$env:NEXT_PUBLIC_API_URL="http://localhost:13001"
 npm run dev
 ```
 
-## API Docs
+## AI Content Review
 
-Login as admin and send the JWT as a Bearer token:
+Before or during post creation/editing, the app can run AI review checks through:
 
-```bash
-POST /auth/login
-GET /docs
-GET /docs/openapi.json
-GET /ai/runs/:runId/failure-analysis
-GET /execution/runs/:runId/events
+```text
+POST /ai/posts/content-review
 ```
 
-The docs endpoint is intentionally protected with `ADMIN` role access because it exposes operational API information.
+The review currently returns:
 
-## Example Workflow Definition
+- SEO score and notes
+- plagiarism risk score and notes
+- sensitive content risk score and notes
+- summary and recommendation
 
-```json
-{
-  "name": "Webhook sync",
-  "timeout_ms": 30000,
-  "schedule": {
-    "cron": "*/5 * * * *"
-  },
-  "nodes": [
-    {
-      "id": "fetch",
-      "name": "Fetch payload",
-      "type": "http",
-      "config": {
-        "method": "GET",
-        "url": "https://jsonplaceholder.typicode.com/users"
-      },
-      "retry": {
-        "max_attempts": 3,
-        "backoff_ms": 1000
-      }
-    },
-    {
-      "id": "wait",
-      "name": "Wait",
-      "type": "delay",
-      "config": {
-        "ms": 500
-      }
-    },
-    {
-      "id": "check",
-      "name": "Check branch",
-      "type": "condition",
-      "config": {
-        "value": true
-      }
-    },
-    {
-      "id": "calculate",
-      "name": "Sandboxed script",
-      "type": "script",
-      "config": {
-        "code": "result = input.count * 2;",
-        "input": {
-          "count": 21
-        },
-        "timeout_ms": 1000
-      }
-    }
-  ],
-  "edges": [
-    { "from": "fetch", "to": "wait" },
-    { "from": "wait", "to": "check" },
-    { "from": "check", "to": "calculate", "condition": true }
-  ]
-}
-```
+If `OPENAI_API_KEY` is missing or the AI response fails validation, the backend falls back to deterministic local heuristics so the feature still works.
 
-## Test And Build
+Important limitation:
+
+- the plagiarism signal is a local similarity and repetition risk check, not a full internet-wide plagiarism scan
+
+## Demo Accounts
+
+- `admin@tenant1.local / password123`
+- `editor@tenant1.local / password123`
+- `user@tenant1.local / password123`
+
+## Build And Verification
 
 Backend:
 
-```bash
+```powershell
 cd backend
-npm run lint
-npx tsc --noEmit
-npx jest --runInBand
-npm run test:e2e
+npx prisma generate
 npm run build
 ```
 
 Frontend:
 
-```bash
+```powershell
 cd frontend
-npm run lint
 npm run build
 ```
 
-CI runs the same checks and Docker image builds in `.github/workflows/ci.yml`.
+Docker:
+
+```powershell
+docker compose up --build -d backend frontend
+docker compose ps
+```
 
 ## Project Documents
 
 - Architecture: `docs/ARCHITECTURE.md`
-- Query optimization and EXPLAIN plan: `docs/QUERY_OPTIMIZATION.md`
-- Engineering practices and PR guidance: `docs/ENGINEERING_PRACTICES.md`
-- Code review exercise: `REVIEW.md`
+- Query optimization notes: `docs/QUERY_OPTIMIZATION.md`
+- Engineering practices: `docs/ENGINEERING_PRACTICES.md`
+- Review notes: `REVIEW.md`
 
-## Trade-Offs
+## Current Trade-Offs
 
-- The scheduler is in-memory and checks active workflows every minute. Production should move this to a queue worker with distributed locking.
-- Execution logs currently live in PostgreSQL for query simplicity. At larger scale, logs should be partitioned or moved to an append-only log store.
-- The backend exposes SSE for run events and the frontend consumes it from run detail. The MVP event bus is still in-memory, so production should move it to Redis Pub/Sub or a queue-backed event transport.
-- The OpenAPI-like docs are hand-authored to avoid adding Swagger dependencies late in the MVP.
-- AI failure analysis works without an API key using deterministic heuristics. If `OPENAI_API_KEY` is present, it sends a bounded run context to an LLM and falls back to heuristics when output is malformed or the provider is unavailable.
-- Lint keeps unsafe `any` rules as warnings because JWT payloads and Prisma-heavy tests still need stronger typing.
+- Public feed currently reads all `PUBLISHED` posts rather than tenant-scoped public blogs
+- AI plagiarism review is heuristic, not provider-backed web matching
+- Redis is available in infrastructure, but the current content workflow is still mostly request/response driven
+- API docs remain admin-protected because they expose operational and management endpoints
 
-## What I Would Improve With More Time
+## Next Good Improvements
 
-- Add distributed SSE/WebSocket fan-out for multi-instance deployments
-- Add visual workflow builder and create/edit workflow UI
-- Add Redis-backed queues for execution workers
-- Add richer branch expressions beyond boolean condition edges
-- Add partitioning or archival policy for high-volume logs
+- add true multi-tenant public blog routing
+- add richer media support for posts and landing page content
+- add threshold enforcement before submit or publish when AI risk is high
+- add healthchecks for every app service in Docker Compose

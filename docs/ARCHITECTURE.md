@@ -2,127 +2,115 @@
 
 ## Overview
 
-FlowForge is split into a NestJS API, PostgreSQL data layer, Redis-ready infrastructure, and a Next.js dashboard. The core backend treats every workflow definition as a directed acyclic graph and persists immutable versions before execution.
+FlowForge now operates as a multi-tenant blog and editorial platform. It combines a public marketing and reading surface with an authenticated dashboard for authoring, moderation, publishing, and AI-assisted post review.
 
 ```text
-Browser
+Guest / Authenticated Reader
   |
-  | JWT + REST
+  | HTTP
   v
-Next.js Dashboard
+Next.js Frontend
+  |-- Public landing page
+  |-- Public post detail
+  |-- Auth flows
+  |-- Editorial dashboard
   |
-  | REST API
+  | REST + JWT
   v
 NestJS API
-  |-- Auth/RBAC
-  |-- Workflow CRUD + Versioning
-  |-- DAG Validation
-  |-- Execution Engine
-  |-- Scheduler
-  |-- Runs/Logs/Health APIs
+  |-- Auth / RBAC
+  |-- Posts
+  |-- Users
+  |-- Tenants
+  |-- AI review
+  |-- API docs
+  |-- Health
   |
   v
 PostgreSQL
 
-Redis is included for future queue/worker scaling.
+Redis is provisioned for future queueing, cache, and async worker expansion.
 ```
+
+## Frontend Shape
+
+Key user-facing routes:
+
+- `/` public landing page with hero, intro, blog feed, contact section, and footer
+- `/posts/[slug]` public published post detail
+- `/dashboard` authenticated editorial workspace
+
+The landing page remains visible even after login. Logged-in users can move between public reading and the dashboard instead of being forced directly into the admin workspace.
 
 ## Backend Modules
 
-- `AuthModule`: login, bcrypt password validation, JWT creation, Passport JWT strategy.
-- `WorkflowsModule`: tenant-scoped CRUD, version history, rollback, definition validation.
-- `ExecutionModule`: manual/webhook execution, DAG utilities, step implementations, scheduled trigger service.
-- `ExecutionModule`: also exposes an in-memory SSE event stream for run and step status updates.
-- `RunsModule`: run history, run detail, step logs, pagination and filtering.
-- `HealthModule`: liveness and tenant execution metrics for the last 24 hours.
-- `ApiDocsModule`: admin-only local API documentation.
-- `AiModule`: failure analysis for failed runs, using heuristic fallback and optional LLM integration.
-- `RateLimitGuard`: in-memory per-user/per-route request limiting for frequently polled dashboard endpoints.
+- `AuthModule`: registration, login, JWT issuance, tenant-aware payloads, and role enforcement
+- `PostsModule`: create, edit, submit, publish, list, and read published content
+- `UsersModule`: role assignment and tenant user management
+- `TenantsModule`: tenant context and tenant-scoped ownership
+- `AiModule`: run analysis plus post content review for SEO, plagiarism risk, and sensitive content
+- `ApiDocsModule`: protected OpenAPI-style local documentation for admin users
+- `HealthModule`: liveness and readiness style health endpoint
 
-## Execution Flow
+Legacy modules for workflows, runs, and execution still exist in the codebase, but the current active product experience is the editorial/blog platform.
 
-1. User or external webhook triggers a workflow.
-2. API resolves workflow by `workflowId` and `tenantId` or webhook `tenantSlug`.
-3. Latest workflow version is loaded.
-4. Definition is validated as a DAG.
-5. Engine computes dependency layers using in-degree tracking.
-6. Steps in the same ready layer execute in parallel.
-7. Condition nodes may route through boolean `condition` edges and mark non-matching downstream paths as `SKIPPED`.
-8. Each step creates a `workflow_run_steps` record.
-9. Retry/backoff is applied per node.
-10. Logs are written to `execution_logs`.
-11. Run finishes as `SUCCEEDED`, `FAILED`, or `TIMEOUT`.
+## Role Model
 
-## Multi-Tenant Isolation
-
-Tenant isolation is enforced in application queries by always scoping workflow, run, step, and log reads/writes with `tenantId`. The JWT payload contains `tenantId`, `tenantSlug`, `sub`, `email`, and `role`.
-
-Webhook execution uses `tenantSlug` plus `workflowId`, then executes with the resolved tenant id. A workflow id from another tenant will not be found because the executor uses both identifiers.
-
-## RBAC Matrix
-
-| Capability | Admin | Editor | Viewer |
+| Capability | User | Editor | Admin |
 | --- | --- | --- | --- |
-| Login | Yes | Yes | Yes |
-| List workflows | Yes | Yes | Yes |
-| Create/update workflow | Yes | Yes | No |
-| Rollback workflow | Yes | Yes | No |
-| Delete workflow | Yes | No | No |
-| Trigger workflow manually | Yes | Yes | No |
-| View runs/logs/health | Yes | Yes | Yes |
-| View API docs | Yes | No | No |
+| Register and login | Yes | Yes | Yes |
+| Read published posts | Yes | Yes | Yes |
+| Create draft | Yes | Yes | Yes |
+| Submit for review | Yes | Yes | Yes |
+| Publish directly | No | Yes | Yes |
+| Review moderation queue | No | Yes | Yes |
+| Manage users and roles | No | No | Yes |
+| View protected API docs | No | No | Yes |
+
+## Editorial Data Flow
+
+1. A user opens the dashboard and creates or edits a post.
+2. The frontend can call `POST /ai/posts/content-review` before save or update.
+3. The backend evaluates the draft with OpenAI if configured.
+4. If AI is unavailable, the backend falls back to local heuristics.
+5. The returned review includes SEO, plagiarism risk, sensitive content risk, summary, and recommendation.
+6. When the post is created or updated, the latest review result is stored in the post record.
+7. Published posts appear in the public landing feed and on `/posts/[slug]`.
 
 ## Data Model
 
-Key tables:
+Important entities:
 
-- `tenants`: tenant boundary.
-- `users`: users belong to tenants and have a role.
-- `workflows`: mutable workflow metadata and current version pointer.
-- `workflow_versions`: immutable JSON DAG versions.
-- `workflow_runs`: execution attempts tied to workflow and version.
-- `workflow_run_steps`: per-step execution status and payloads.
-- `execution_logs`: append-style step/run logs.
+- `tenants`: tenant boundary
+- `users`: tenant users with roles
+- `posts`: editorial content with author, status, slug, and publication fields
+- `post.contentReview`: JSON review payload containing AI or heuristic analysis
+- `post.reviewCheckedAt`: last review timestamp
 
-## Deployment Design
+This lets the dashboard show persisted content quality metadata without rerunning checks on every read.
 
-For production on AWS:
+## Docker Runtime Layout
 
-```text
-Route 53
-  |
-CloudFront + ACM
-  |
-Application Load Balancer
-  |
-ECS Fargate Services
-  |-- frontend service
-  |-- api service
-  |-- worker/scheduler service
-  |
-RDS PostgreSQL
-ElastiCache Redis
-CloudWatch Logs
-Secrets Manager
-```
+The repository uses Docker Compose for a reproducible local environment:
 
-Choices:
+- `frontend` on host port `13000`
+- `backend` on host port `13001`
+- `postgres` on host port `15432`
+- `redis` on host port `16379`
 
-- ECS Fargate keeps ops lightweight while supporting independent API/frontend/worker scaling.
-- RDS PostgreSQL provides backups, PITR, monitoring, and managed upgrades.
-- ElastiCache Redis supports BullMQ queues and distributed scheduler locks.
-- Secrets Manager stores `DATABASE_URL`, `JWT_SECRET`, webhook secrets, and LLM keys.
-- CloudWatch centralizes application and execution logs.
+All ports are bound to `127.0.0.1` by default to reduce accidental LAN exposure during development.
 
-## Operational Concerns
+## Security Notes
 
-- API containers should be stateless.
-- Scheduler should run as a single worker or use distributed locks.
-- SSE uses an in-memory event bus in the MVP; production should back it with Redis Pub/Sub or another distributed event transport.
-- Long-running executions should move to queue workers.
-- Logs need retention and archival policy.
-- All list endpoints should keep tenant-first indexes.
-- Rate limiting is local to one API process in the MVP. Production should use Redis-backed counters so limits remain consistent across scaled API tasks.
-- Webhooks should use HMAC signatures before production exposure.
-- The MVP supports optional webhook HMAC validation through `WEBHOOK_SECRET` and `x-flowforge-signature`.
-- AI analysis should avoid sending secrets or full payloads to external providers; current implementation truncates logs and falls back if provider output is malformed.
+- JWT secures dashboard and management endpoints
+- public blog endpoints expose published content only
+- `.env` must remain local and should never be committed
+- `.env.example` exists only for non-secret placeholders
+- OpenAI keys are read from environment variables and should be rotated if ever exposed
+
+## Operational Notes
+
+- The current AI plagiarism review is heuristic and does not compare against the public web
+- Redis is not yet heavily used by the editorial flow, but it is ready for queue-backed review or publishing jobs later
+- The public blog feed currently reads all published posts rather than routing by public tenant slug
+- Protected docs remain admin-only because they expose internal and management routes

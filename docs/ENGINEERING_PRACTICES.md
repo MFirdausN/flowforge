@@ -1,33 +1,70 @@
 # Engineering Practices
 
-## Branch And Pull Request Evidence
+## Documentation Discipline
 
-The technical test asks for meaningful Git history and at least one self-authored pull request. The repository includes `.github/pull_request_template.md` so the submitted PR can clearly describe scope, validation, trade-offs, and review context.
+Whenever product behavior changes, update these together:
 
-Recommended final submission flow:
+- `README.md` for setup, routes, and environment variables
+- `docs/ARCHITECTURE.md` for system shape and module responsibilities
+- `docs/QUERY_OPTIMIZATION.md` when core read patterns or indexes change
+- `.env.example` when new environment variables are introduced
 
-```bash
-git checkout -b feat/flowforge-mvp-hardening
-git add .
-git commit -m "feat: harden flowforge mvp requirements"
-git push origin feat/flowforge-mvp-hardening
+For this repository, documentation should stay aligned with the editorial/blog platform rather than the older workflow-orchestration description.
+
+## Secret Handling
+
+Rules for environment files:
+
+- commit `.env.example`
+- do not commit `.env`
+- never place real API keys, JWT secrets, or database passwords in tracked Markdown examples
+- if a secret is accidentally committed, rotate it immediately and remove it from history if needed
+
+Recommended pattern:
+
+```text
+.env.example   tracked, placeholder values only
+.env           local only, real secrets
 ```
 
-Then open a pull request into `main` using the template. In the PR description, include:
+## Docker-First Local Workflow
 
-- The core features implemented: DAG engine, auth/RBAC, multi-tenancy, workflow versioning, execution tracking, realtime SSE, docs, AI failure analysis.
-- Validation commands and results.
-- Known trade-offs: in-memory scheduler, in-memory SSE event bus, in-memory rate limiter, PostgreSQL logs for MVP.
-- What would be improved next: distributed queues, Redis-backed rate limits/events, webhook signatures, sandboxed script execution.
+The repository is optimized for Docker-based local startup:
 
-## Commit Quality
+```powershell
+Copy-Item .env.example .env
+docker compose up --build -d
+```
 
-Prefer small commits grouped by concern:
+Use local non-Docker `npm run dev` only when you specifically need faster iteration or direct framework debugging.
 
-- `feat: add workflow dag validation and execution engine`
-- `feat: add tenant-scoped workflow api and versioning`
-- `feat: add run tracking and realtime sse events`
-- `test: cover dag executor and api workflow run`
-- `docs: add architecture and operational tradeoffs`
+## Change Checklist
 
-Avoid vague commit messages such as `update` for the final submitted history if there is time to clean it on a feature branch.
+When changing product behavior, verify:
+
+- routes still build in Next.js
+- backend compiles after Prisma or DTO changes
+- Docker images still build
+- public pages work for guests
+- dashboard flows still work for authenticated users
+- AI review gracefully degrades when `OPENAI_API_KEY` is missing
+
+## Pull Request Guidance
+
+Strong PRs in this repo should call out:
+
+- user-facing changes
+- API contract changes
+- new environment variables
+- migration files and deploy impact
+- Docker changes
+- verification commands actually run
+
+Good examples:
+
+- `feat: add public landing page and post detail routes`
+- `feat: persist ai content review on posts`
+- `fix: correct backend docker runtime entrypoint`
+- `docs: sync readme and architecture with editorial platform`
+
+Avoid vague commit messages like `fix stuff` or `update docs`.
